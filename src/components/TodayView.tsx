@@ -48,6 +48,10 @@ function numericValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
 }
 
+function digitsOnly(value: string) {
+  return value.replace(/\D/g, "");
+}
+
 function withAutoBmr(day: DayRecord, profile: BodyProfile): DayRecord {
   if (typeof day.weightKg !== "number" || day.weightKg <= 0 || day.basalMetabolismKcal) return day;
   return {
@@ -432,7 +436,7 @@ export function TodayView({
                                 }}
                               >
                                 <Plus className="h-4 w-4" />
-                                Внести
+                                Ввести
                               </button>
                               <button
                                 className={`btn ${active ? "btn-danger" : "btn-primary"} min-w-28`}
@@ -445,40 +449,60 @@ export function TodayView({
                             </div>
                           </div>
                           {manualOpen && (
-                            <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_0.65fr_0.65fr_auto]">
-                              <input
-                                className="field"
-                                type="date"
-                                value={manualDraft.date}
-                                onChange={(event) =>
-                                  setManualDraft((current) => ({ ...current, date: event.target.value }))
-                                }
-                              />
-                              <input
-                                className="field"
-                                inputMode="numeric"
-                                min="0"
-                                placeholder="часы"
-                                type="number"
-                                value={manualDraft.hours}
-                                onChange={(event) =>
-                                  setManualDraft((current) => ({ ...current, hours: event.target.value }))
-                                }
-                              />
-                              <input
-                                className="field"
-                                inputMode="numeric"
-                                min="0"
-                                max="59"
-                                placeholder="мин"
-                                type="number"
-                                value={manualDraft.minutes}
-                                onChange={(event) =>
-                                  setManualDraft((current) => ({ ...current, minutes: event.target.value }))
-                                }
-                              />
+                            <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                              <div className="grid gap-3 sm:grid-cols-[1.2fr_1fr]">
+                                <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                  Дата
+                                  <input
+                                    className="field mt-1 min-h-11"
+                                    type="date"
+                                    value={manualDraft.date}
+                                    onChange={(event) =>
+                                      setManualDraft((current) => ({ ...current, date: event.target.value }))
+                                    }
+                                  />
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                    Часы
+                                    <input
+                                      aria-label="Часы"
+                                      className="field mt-1 min-h-11 text-center font-mono text-base font-black"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      placeholder="0"
+                                      type="text"
+                                      value={manualDraft.hours}
+                                      onChange={(event) =>
+                                        setManualDraft((current) => ({
+                                          ...current,
+                                          hours: digitsOnly(event.target.value).slice(0, 3),
+                                        }))
+                                      }
+                                    />
+                                  </label>
+                                  <label className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+                                    Минуты
+                                    <input
+                                      aria-label="Минуты"
+                                      className="field mt-1 min-h-11 text-center font-mono text-base font-black"
+                                      inputMode="numeric"
+                                      pattern="[0-9]*"
+                                      placeholder="0"
+                                      type="text"
+                                      value={manualDraft.minutes}
+                                      onChange={(event) =>
+                                        setManualDraft((current) => ({
+                                          ...current,
+                                          minutes: digitsOnly(event.target.value).slice(0, 2),
+                                        }))
+                                      }
+                                    />
+                                  </label>
+                                </div>
+                              </div>
                               <button
-                                className="btn btn-primary"
+                                className="btn btn-primary mt-3 w-full"
                                 type="button"
                                 onClick={() => {
                                   void addManualEntry(category);
