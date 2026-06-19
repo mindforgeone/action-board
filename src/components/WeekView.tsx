@@ -1,9 +1,28 @@
-import { Activity, BriefcaseBusiness, Dumbbell, Flame, GraduationCap, TimerReset } from "lucide-react";
-import { useMemo, useState } from "react";
+import {
+  Activity,
+  BriefcaseBusiness,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Dumbbell,
+  Flame,
+  GraduationCap,
+  TimerReset,
+  X,
+} from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { TARGETS } from "../constants";
 import type { BodyProfile, DayRecord, TimeEntry, TimerCategory } from "../types";
 import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
-import { formatShortDate, formatWeekday, getMonthRange, getWeekRange, localDateKey, minutesToHours } from "../utils/date";
+import {
+  formatDate,
+  formatShortDate,
+  formatWeekday,
+  getMonthRange,
+  getWeekRange,
+  localDateKey,
+  minutesToHours,
+} from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
 
 type WeekViewProps = {
@@ -13,21 +32,58 @@ type WeekViewProps = {
   bodyProfile: BodyProfile;
 };
 
-type PeriodMode = "week" | "month";
+type PeriodMode = "week" | "month" | "year";
+
+type PeriodRange = {
+  from: string;
+  to: string;
+  days: string[];
+  label: string;
+};
+
+type PeriodSlice = {
+  id: string;
+  label: string;
+  from: string;
+  to: string;
+  days: string[];
+};
+
+type PeriodSummary = {
+  totalMinutes: number;
+  professionMinutes: number;
+  bodyMinutes: number;
+  currentWorkMinutes: number;
+  totalDeficit: number;
+  averageDeficit: number;
+  bodyEnergyDayCount: number;
+  activeAverage: number;
+  workouts: number;
+  trackedDays: number;
+};
 
 export function WeekView({ days, entries, categories, bodyProfile }: WeekViewProps) {
   const [periodMode, setPeriodMode] = useState<PeriodMode>("week");
-  const period = useMemo(() => {
-    if (periodMode === "week") return getWeekRange();
-    const month = getMonthRange();
-    return {
-      ...month,
-      days: daysBetween(month.from, month.to),
-    };
-  }, [periodMode]);
+  const [anchorDate, setAnchorDate] = useState(localDateKey());
+  const [selectedDate, setSelectedDate] = useState("");
+
+  const anchor = useMemo(() => dateFromKey(anchorDate), [anchorDate]);
+  const period = useMemo(() => getPeriodRange(periodMode, anchor), [anchor, periodMode]);
   const periodFactor = period.days.length / 7;
   const periodDays = period.days.map((date) => days[date] ?? { date });
   const periodEntries = entries.filter((entry) => entry.date >= period.from && entry.date <= period.to);
+  const periodSlices = useMemo(
+    () => buildPeriodSlices(periodMode, period),
+    [period.from, period.to, periodMode],
+  );
+  const sliceSummaries = useMemo(
+    () =>
+      periodSlices.map((slice) => ({
+        ...slice,
+        summary: summarizePeriod(slice.days, days, entries, bodyProfile, slice.from, slice.to),
+      })),
+    [bodyProfile, days, entries, periodSlices],
+  );
 
   const oneCMinutes = sumMinutes(periodEntries, (entry) => entry.categoryId === "skillbox-1c");
   const practiceMinutes = sumMinutes(periodEntries, (entry) => entry.categoryId === "practice-final");
@@ -41,10 +97,10 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
 
   const statusCounts = { red: 0, yellow: 0, green: 0, combat: 0 };
   periodDays.forEach((day) => {
-    const score = calculateDayScore(
-      day,
-      periodEntries.filter((entry) => entry.date === day.date),
-    );
+    const dayEntries = periodEntries.filter((entry) => entry.date === day.date);
+    if (!hasTrackedData(day, dayEntries)) return;
+
+    const score = calculateDayScore(day, dayEntries);
     statusCounts[score.statusKey] += 1;
   });
 
@@ -54,42 +110,90 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
   const workouts = periodDays.filter((day) => day.workout).length;
   const noAlcoholDays = periodDays.filter((day) => day.alcohol === false).length;
   const noBingeDays = periodDays.filter((day) => day.binge === false).length;
+  const trackedDays = periodDays.filter((day) =>
+    hasTrackedData(day, periodEntries.filter((entry) => entry.date === day.date)),
+  ).length;
 
-  const byCategory = categories.map((category) => ({
-    ...category,
-    minutes: sumMinutes(periodEntries, (entry) => entry.categoryId === category.id),
-  })).filter((item) => item.minutes > 0);
+  const byCategory = categories
+    .map((category) => ({
+      ...category,
+      minutes: sumMinutes(periodEntries, (entry) => entry.categoryId === category.id),
+    }))
+    .filter((item) => item.minutes > 0);
   const maxCategoryMinutes = Math.max(1, ...byCategory.map((item) => item.minutes));
+
+  const selectedRow = selectedDate
+    ? buildDayRow(selectedDate, days, entries, bodyProfile)
+    : undefined;
+
+  function shiftPeriod(direction: -1 | 1) {
+    const next = new Date(anchor);
+    if (periodMode === "week") next.setDate(next.getDate() + direction * 7);
+    if (periodMode === "month") next.setMonth(next.getMonth() + direction);
+    if (periodMode === "year") next.setFullYear(next.getFullYear() + direction);
+    setAnchorDate(localDateKey(next));
+    setSelectedDate("");
+  }
+
+  function setMode(mode: PeriodMode) {
+    setPeriodMode(mode);
+    setSelectedDate("");
+  }
 
   return (
     <div className="space-y-6">
       <section className="panel p-5">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
               Аналитика
             </p>
-            <h1 className="mt-2 text-3xl font-black tracking-normal">
-              {formatShortDate(period.from)} - {formatShortDate(period.to)}
+            <h1 className="mt-2 text-3xl font-black tracking-normal text-slate-950">
+              {period.label}
             </h1>
+            <p className="mt-1 text-sm font-semibold text-slate-500">
+              {formatShortDate(period.from)} - {formatShortDate(period.to)}
+            </p>
           </div>
+
           <div className="flex flex-wrap items-center gap-2">
-            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
-              <button
-                className={`btn ${periodMode === "week" ? "bg-slate-950 text-white" : "text-slate-700"}`}
-                type="button"
-                onClick={() => setPeriodMode("week")}
-              >
-                Неделя
+            <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-100 p-1">
+              <PeriodButton active={periodMode === "week"} label="Неделя" onClick={() => setMode("week")} />
+              <PeriodButton active={periodMode === "month"} label="Месяц" onClick={() => setMode("month")} />
+              <PeriodButton active={periodMode === "year"} label="Год" onClick={() => setMode("year")} />
+            </div>
+
+            <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1">
+              <button className="btn min-w-10 px-2" type="button" onClick={() => shiftPeriod(-1)}>
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <button
-                className={`btn ${periodMode === "month" ? "bg-slate-950 text-white" : "text-slate-700"}`}
-                type="button"
-                onClick={() => setPeriodMode("month")}
-              >
-                Месяц
+              <button className="btn min-w-10 px-2" type="button" onClick={() => shiftPeriod(1)}>
+                <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+
+            <PeriodPicker
+              anchor={anchor}
+              anchorDate={anchorDate}
+              mode={periodMode}
+              onDateChange={(value) => {
+                setAnchorDate(value);
+                setSelectedDate("");
+              }}
+            />
+
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => {
+                setAnchorDate(localDateKey());
+                setSelectedDate("");
+              }}
+            >
+              <CalendarDays className="h-4 w-4" />
+              Сегодня
+            </button>
+
             <p className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
               {minutesToHours(sumMinutes(periodEntries, () => true))} ч всего
             </p>
@@ -142,7 +246,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
           <div className="mt-5 space-y-4">
             {byCategory.length === 0 ? (
               <p className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                За неделю еще нет записей времени.
+                За выбранный период еще нет записей времени.
               </p>
             ) : (
               byCategory.map((category) => (
@@ -177,6 +281,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
           <div className="panel p-5">
             <h2 className="text-xl font-black">Средние метрики</h2>
             <div className="mt-4 grid gap-3 text-sm">
+              <LineMetric label="Дней с данными" value={String(trackedDays)} />
               <LineMetric label="Калории" value={caloriesAverage ? `${caloriesAverage} ккал` : "-"} />
               <LineMetric label="Белок" value={proteinAverage ? `${proteinAverage} г` : "-"} />
               <LineMetric label="Активность" value={activeAverage ? `${activeAverage} ккал` : "-"} />
@@ -189,6 +294,67 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
           </div>
         </div>
       </section>
+
+      {sliceSummaries.length > 0 && (
+        <section className="panel overflow-hidden">
+          <div className="border-b border-slate-200 p-5">
+            <h2 className="text-xl font-black">
+              {periodMode === "month" ? "Недели внутри месяца" : "Месяцы внутри года"}
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-[0.12em] text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Период</th>
+                  <th className="px-4 py-3">Всего</th>
+                  <th className="px-4 py-3">Профессия</th>
+                  <th className="px-4 py-3">Тело</th>
+                  <th className="px-4 py-3">Работа</th>
+                  <th className="px-4 py-3">Дефицит</th>
+                  <th className="px-4 py-3">Средний дефицит</th>
+                  <th className="px-4 py-3">Активность</th>
+                  <th className="px-4 py-3">Тренировки</th>
+                  <th className="px-4 py-3">Дней с данными</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {sliceSummaries.map((slice) => (
+                  <tr
+                    className="cursor-pointer transition hover:bg-slate-50"
+                    key={slice.id}
+                    onClick={() => {
+                      setPeriodMode(periodMode === "year" ? "month" : "week");
+                      setAnchorDate(slice.from);
+                      setSelectedDate("");
+                    }}
+                  >
+                    <td className="px-4 py-3 font-semibold">
+                      {slice.label}
+                      <span className="block text-xs font-semibold text-slate-500">
+                        {formatShortDate(slice.from)} - {formatShortDate(slice.to)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">{minutesToHours(slice.summary.totalMinutes)} ч</td>
+                    <td className="px-4 py-3">{minutesToHours(slice.summary.professionMinutes)} ч</td>
+                    <td className="px-4 py-3">{minutesToHours(slice.summary.bodyMinutes)} ч</td>
+                    <td className="px-4 py-3">{minutesToHours(slice.summary.currentWorkMinutes)} ч</td>
+                    <td className="px-4 py-3 font-semibold">
+                      {slice.summary.bodyEnergyDayCount ? `${formatSignedKcal(slice.summary.totalDeficit)} ккал` : "-"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {slice.summary.bodyEnergyDayCount ? `${formatSignedKcal(slice.summary.averageDeficit)} ккал` : "-"}
+                    </td>
+                    <td className="px-4 py-3">{slice.summary.activeAverage ? `${slice.summary.activeAverage} ккал` : "-"}</td>
+                    <td className="px-4 py-3">{slice.summary.workouts}</td>
+                    <td className="px-4 py-3">{slice.summary.trackedDays}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section className="panel overflow-hidden">
         <div className="border-b border-slate-200 p-5">
@@ -215,17 +381,26 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 const dayEntries = periodEntries.filter((entry) => entry.date === day.date);
                 const score = calculateDayScore(day, dayEntries);
                 const bodyEnergy = calculateBodyEnergy(day, bodyProfile);
+                const tracked = hasTrackedData(day, dayEntries);
                 return (
-                  <tr key={day.date}>
+                  <tr
+                    className="cursor-pointer transition hover:bg-slate-50"
+                    key={day.date}
+                    onClick={() => setSelectedDate(day.date)}
+                  >
                     <td className="px-4 py-3 font-semibold">
                       {formatWeekday(day.date)} {formatShortDate(day.date)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${score.statusClass}`}>
-                        {score.statusLabel}
+                      <span
+                        className={`inline-flex rounded-md border px-2 py-1 text-xs font-black ${
+                          tracked ? score.statusClass : "border-slate-200 bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {tracked ? score.statusLabel : "Нет данных"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-black">{score.points}</td>
+                    <td className="px-4 py-3 font-black">{tracked ? score.points : "-"}</td>
                     <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.categoryId === "skillbox-1c"))}</td>
                     <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.group === "profession"))}</td>
                     <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.group === "body"))}</td>
@@ -242,8 +417,208 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
           </table>
         </div>
       </section>
+
+      {selectedRow && (
+        <DayDetailsModal
+          row={selectedRow}
+          onClose={() => setSelectedDate("")}
+        />
+      )}
     </div>
   );
+}
+
+function PeriodButton({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`btn ${active ? "bg-slate-950 text-white" : "text-slate-700"}`}
+      type="button"
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function PeriodPicker({
+  anchor,
+  anchorDate,
+  mode,
+  onDateChange,
+}: {
+  anchor: Date;
+  anchorDate: string;
+  mode: PeriodMode;
+  onDateChange: (date: string) => void;
+}) {
+  if (mode === "month") {
+    return (
+      <input
+        className="field min-h-10 w-40"
+        type="month"
+        value={anchorDate.slice(0, 7)}
+        onChange={(event) => {
+          if (event.target.value) onDateChange(`${event.target.value}-01`);
+        }}
+      />
+    );
+  }
+
+  if (mode === "year") {
+    return (
+      <input
+        className="field min-h-10 w-28"
+        max="2200"
+        min="2000"
+        type="number"
+        value={anchor.getFullYear()}
+        onChange={(event) => {
+          const year = Number(event.target.value);
+          if (Number.isInteger(year) && year >= 2000 && year <= 2200) {
+            onDateChange(localDateKey(new Date(year, 0, 1)));
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <input
+      className="field min-h-10 w-40"
+      type="date"
+      value={anchorDate}
+      onChange={(event) => {
+        if (event.target.value) onDateChange(event.target.value);
+      }}
+    />
+  );
+}
+
+function summarizePeriod(
+  periodDays: string[],
+  days: Record<string, DayRecord>,
+  entries: TimeEntry[],
+  bodyProfile: BodyProfile,
+  from: string,
+  to: string,
+): PeriodSummary {
+  const periodEntries = entries.filter((entry) => entry.date >= from && entry.date <= to);
+  const dayRecords = periodDays.map((date) => days[date] ?? { date });
+  const bodyEnergyDays = dayRecords.map((day) => calculateBodyEnergy(day, bodyProfile)).filter((day) => day.hasData);
+  const totalDeficit = bodyEnergyDays.reduce((sum, day) => sum + day.deficit, 0);
+
+  return {
+    totalMinutes: sumMinutes(periodEntries, () => true),
+    professionMinutes: sumMinutes(periodEntries, (entry) => entry.group === "profession"),
+    bodyMinutes: sumMinutes(periodEntries, (entry) => entry.group === "body"),
+    currentWorkMinutes: sumMinutes(periodEntries, (entry) => entry.categoryId === "current-job"),
+    totalDeficit,
+    averageDeficit: bodyEnergyDays.length ? Math.round(totalDeficit / bodyEnergyDays.length) : 0,
+    bodyEnergyDayCount: bodyEnergyDays.length,
+    activeAverage: average(dayRecords.map((day) => day.activeKcal)),
+    workouts: dayRecords.filter((day) => day.workout).length,
+    trackedDays: dayRecords.filter((day) =>
+      hasTrackedData(day, periodEntries.filter((entry) => entry.date === day.date)),
+    ).length,
+  };
+}
+
+function buildDayRow(
+  date: string,
+  days: Record<string, DayRecord>,
+  entries: TimeEntry[],
+  bodyProfile: BodyProfile,
+) {
+  const day = days[date] ?? { date };
+  const dayEntries = entries.filter((entry) => entry.date === date);
+  return {
+    date,
+    day,
+    entries: dayEntries,
+    score: calculateDayScore(day, dayEntries),
+    bodyEnergy: calculateBodyEnergy(day, bodyProfile),
+  };
+}
+
+function getPeriodRange(mode: PeriodMode, anchor: Date): PeriodRange {
+  if (mode === "week") {
+    const week = getWeekRange(anchor);
+    return {
+      ...week,
+      label: `Неделя ${formatShortDate(week.from)} - ${formatShortDate(week.to)}`,
+    };
+  }
+
+  if (mode === "month") {
+    const month = getMonthRange(anchor);
+    return {
+      ...month,
+      days: daysBetween(month.from, month.to),
+      label: formatMonthTitle(anchor),
+    };
+  }
+
+  const yearStart = new Date(anchor.getFullYear(), 0, 1);
+  const yearEnd = new Date(anchor.getFullYear(), 11, 31);
+  const from = localDateKey(yearStart);
+  const to = localDateKey(yearEnd);
+
+  return {
+    from,
+    to,
+    days: daysBetween(from, to),
+    label: `${anchor.getFullYear()} год`,
+  };
+}
+
+function buildPeriodSlices(mode: PeriodMode, period: PeriodRange): PeriodSlice[] {
+  if (mode === "week") return [];
+
+  if (mode === "year") {
+    const year = dateFromKey(period.from).getFullYear();
+    return Array.from({ length: 12 }, (_, index) => {
+      const anchor = new Date(year, index, 1);
+      const month = getMonthRange(anchor);
+      return {
+        id: month.from,
+        label: formatMonthTitle(anchor),
+        from: month.from,
+        to: month.to,
+        days: daysBetween(month.from, month.to),
+      };
+    });
+  }
+
+  const slices: PeriodSlice[] = [];
+  let cursor = dateFromKey(period.from);
+  let index = 1;
+
+  while (localDateKey(cursor) <= period.to) {
+    const week = getWeekRange(cursor);
+    const from = maxDateKey(week.from, period.from);
+    const to = minDateKey(week.to, period.to);
+
+    slices.push({
+      id: from,
+      label: `Неделя ${index}`,
+      from,
+      to,
+      days: daysBetween(from, to),
+    });
+
+    cursor = dateFromKey(addDays(to, 1));
+    index += 1;
+  }
+
+  return slices;
 }
 
 function average(values: Array<number | undefined>) {
@@ -253,8 +628,8 @@ function average(values: Array<number | undefined>) {
 }
 
 function daysBetween(from: string, to: string) {
-  const end = new Date(`${to}T00:00:00`);
-  const current = new Date(`${from}T00:00:00`);
+  const end = dateFromKey(to);
+  const current = dateFromKey(from);
   const result: string[] = [];
 
   while (current <= end) {
@@ -265,13 +640,53 @@ function daysBetween(from: string, to: string) {
   return result;
 }
 
+function dateFromKey(dateKey: string) {
+  return new Date(`${dateKey}T00:00:00`);
+}
+
+function addDays(dateKey: string, amount: number) {
+  const date = dateFromKey(dateKey);
+  date.setDate(date.getDate() + amount);
+  return localDateKey(date);
+}
+
+function minDateKey(a: string, b: string) {
+  return a < b ? a : b;
+}
+
+function maxDateKey(a: string, b: string) {
+  return a > b ? a : b;
+}
+
+function formatMonthTitle(date: Date) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
+function hasTrackedData(day: DayRecord, dayEntries: TimeEntry[]) {
+  return (
+    dayEntries.length > 0 ||
+    typeof day.calories === "number" ||
+    typeof day.activeKcal === "number" ||
+    typeof day.weightKg === "number" ||
+    typeof day.proteinGrams === "number" ||
+    typeof day.points === "number" ||
+    Boolean(day.closedAt) ||
+    Boolean(day.artifact) ||
+    Boolean(day.reflection) ||
+    Boolean(day.note)
+  );
+}
+
 function MetricCard({
   icon,
   label,
   value,
   progress,
 }: {
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   value: string;
   progress: number;
@@ -312,6 +727,131 @@ function LineMetric({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
       <span className="font-semibold text-slate-600">{label}</span>
       <span className="font-black text-slate-950">{value}</span>
+    </div>
+  );
+}
+
+function DayDetailsModal({
+  row,
+  onClose,
+}: {
+  row: ReturnType<typeof buildDayRow>;
+  onClose: () => void;
+}) {
+  const professionMinutes = sumMinutes(row.entries, (entry) => entry.group === "profession");
+  const bodyMinutes = sumMinutes(row.entries, (entry) => entry.group === "body");
+  const workMinutes = sumMinutes(row.entries, (entry) => entry.group === "work");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-3 sm:items-center">
+      <section className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-lg bg-white shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-200 bg-white p-5">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
+              День периода
+            </p>
+            <h2 className="mt-1 text-2xl font-black text-slate-950">{formatDate(row.date)}</h2>
+          </div>
+          <button
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-slate-200 text-slate-700 hover:bg-slate-50"
+            type="button"
+            onClick={onClose}
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-5">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailStat label="Статус" value={hasTrackedData(row.day, row.entries) ? row.score.statusLabel : "Нет данных"} />
+            <DetailStat label="Очки" value={hasTrackedData(row.day, row.entries) ? String(row.score.points) : "-"} />
+            <DetailStat label="Профессия" value={`${minutesToHours(professionMinutes)} ч`} />
+            <DetailStat label="Тело действия" value={`${minutesToHours(bodyMinutes)} ч`} />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <DetailStat label="Вес" value={row.day.weightKg ? `${row.day.weightKg} кг` : "-"} />
+            <DetailStat label="Съедено" value={row.day.calories ? `${row.day.calories} ккал` : "-"} />
+            <DetailStat label="Расход" value={row.bodyEnergy.hasData ? `${row.bodyEnergy.burned} ккал` : "-"} />
+            <DetailStat
+              label="Дефицит"
+              value={row.bodyEnergy.hasData ? `${formatSignedKcal(row.bodyEnergy.deficit)} ккал` : "-"}
+              valueClass={row.bodyEnergy.toneClass}
+            />
+            <DetailStat label="BMR" value={row.bodyEnergy.basal ? `${row.bodyEnergy.basal} ккал` : "-"} />
+            <DetailStat label="Активные" value={row.day.activeKcal ? `${row.day.activeKcal} ккал` : "-"} />
+            <DetailStat label="Белок" value={row.day.proteinGrams ? `${row.day.proteinGrams} г` : "-"} />
+            <DetailStat label="Шаги" value={row.day.steps ? String(row.day.steps) : "-"} />
+            <DetailStat label="Сон" value={row.day.sleepHours ? `${row.day.sleepHours} ч` : "-"} />
+            <DetailStat label="Энергия" value={row.day.energy ? `${row.day.energy}/5` : "-"} />
+            <DetailStat label="Тренировка" value={row.day.workout ? "Да" : "Нет"} />
+            <DetailStat label="Работа" value={`${minutesToHours(workMinutes)} ч`} />
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <TextBlock label="Артефакт дня" value={row.day.artifact} />
+            <TextBlock label="Рефлексия дня" value={row.day.reflection} />
+            <TextBlock label="Заметка дня" value={row.day.note} />
+            <div className="rounded-lg border border-slate-200 p-4">
+              <p className="text-sm font-black text-slate-700">Что дало очки</p>
+              <ul className="mt-3 space-y-2 text-sm text-slate-600">
+                {row.score.reasons.length ? (
+                  row.score.reasons.map((reason) => <li key={reason}>{reason}</li>)
+                ) : (
+                  <li>Очков не было.</li>
+                )}
+              </ul>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4">
+            <p className="text-sm font-black text-slate-700">Записи времени</p>
+            <div className="mt-3 space-y-2">
+              {row.entries.length ? (
+                row.entries.map((entry) => (
+                  <div
+                    className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm"
+                    key={entry.id}
+                  >
+                    <span className="font-semibold text-slate-700">{entry.category}</span>
+                    <span className="font-mono font-black text-slate-950">
+                      {minutesToHours(entry.durationMinutes)} ч
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Записей времени нет.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DetailStat({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className={`mt-1 text-lg font-black ${valueClass ?? "text-slate-950"}`}>{value}</p>
+    </div>
+  );
+}
+
+function TextBlock({ label, value }: { label: string; value?: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 p-4">
+      <p className="text-sm font-black text-slate-700">{label}</p>
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{value || "-"}</p>
     </div>
   );
 }
