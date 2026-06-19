@@ -16,6 +16,7 @@ export type DayRecord = {
   userId?: string;
   date: string;
   calories?: number;
+  basalMetabolismKcal?: number;
   proteinGrams?: number;
   activeKcal?: number;
   steps?: number;

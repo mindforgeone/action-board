@@ -14,6 +14,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { GROUP_LABELS, QUICK_METRICS, TARGETS } from "../constants";
 import type { ActiveTimer, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
+import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import { formatDate, formatTimer, minutesToHours } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
 
@@ -87,6 +88,7 @@ export function TodayView({
     sumMinutes(entries, (entry) => entry.group === "body") + (activeMinutesByGroup.body ?? 0);
   const workMinutes =
     sumMinutes(entries, (entry) => entry.group === "work") + (activeMinutesByGroup.work ?? 0);
+  const bodyEnergy = calculateBodyEnergy(draft);
 
   const groupedCategories = CATEGORY_GROUPS.map((group) => ({
     group,
@@ -204,10 +206,14 @@ export function TodayView({
             </div>
             <div className="kpi-card">
               <p className="text-sm font-semibold text-slate-500">Тело</p>
-              <p className="mt-2 text-3xl font-black text-emerald-700">
-                {minutesToHours(bodyMinutes)} ч
+              <p className={`mt-2 text-3xl font-black ${bodyEnergy.toneClass}`}>
+                {bodyEnergy.hasData ? `${formatSignedKcal(bodyEnergy.deficit)} ккал` : "нет данных"}
               </p>
-              <ProgressBar value={progressPercent(bodyMinutes, TARGETS.dailyBodyMinutes)} />
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {bodyEnergy.label}
+                {bodyEnergy.hasData ? ` · расход ${bodyEnergy.burned} ккал` : ""}
+              </p>
+              <ProgressBar value={progressPercent(Math.max(0, bodyEnergy.deficit), TARGETS.dailyBodyDeficitKcal)} />
             </div>
           </div>
         </div>
@@ -245,6 +251,9 @@ export function TodayView({
           </div>
           <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
             Текущая работа сегодня: {minutesToHours(workMinutes)} ч
+          </div>
+          <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+            Действия по телу: {minutesToHours(bodyMinutes)} ч. Главный показатель тела теперь kcal-баланс.
           </div>
         </div>
       </section>

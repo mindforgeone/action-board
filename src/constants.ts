@@ -111,6 +111,12 @@ export const QUICK_METRICS: QuickMetricDefinition[] = [
     kind: "number",
   },
   {
+    id: "basalMetabolismKcal",
+    field: "basalMetabolismKcal",
+    label: "Базовый метаболизм",
+    kind: "number",
+  },
+  {
     id: "proteinGrams",
     field: "proteinGrams",
     label: "Белок, г",
@@ -335,9 +341,9 @@ export const DEFAULT_GOALS: Omit<Goal, "userId" | "createdAt" | "updatedAt">[] =
 
 export const TARGETS = {
   dailyProfessionMinutes: 240,
-  dailyBodyMinutes: 60,
+  dailyBodyDeficitKcal: 700,
   weeklyOneCMinutes: 600,
   weeklyPracticeMinutes: 300,
   weeklyPetProjectMinutes: 240,
-  weeklyBodyMinutes: 300,
+  weeklyBodyDeficitKcal: 3500,
 };

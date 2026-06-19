@@ -1,6 +1,7 @@
 import { Activity, BriefcaseBusiness, Dumbbell, Flame, TimerReset } from "lucide-react";
 import { TARGETS } from "../constants";
 import type { DayRecord, TimeEntry, TimerCategory } from "../types";
+import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import { formatShortDate, formatWeekday, getWeekRange, minutesToHours } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
 
@@ -20,6 +21,9 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
   const petMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "pet-construction");
   const currentWorkMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "current-job");
   const bodyMinutes = sumMinutes(weekEntries, (entry) => entry.group === "body");
+  const bodyEnergyDays = weekDays.map((day) => calculateBodyEnergy(day)).filter((day) => day.hasData);
+  const totalDeficit = bodyEnergyDays.reduce((sum, day) => sum + day.deficit, 0);
+  const averageDeficit = bodyEnergyDays.length ? Math.round(totalDeficit / bodyEnergyDays.length) : 0;
 
   const statusCounts = { red: 0, yellow: 0, green: 0, combat: 0 };
   weekDays.forEach((day) => {
@@ -82,9 +86,9 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
         />
         <MetricCard
           icon={<Dumbbell className="h-5 w-5" />}
-          label="Тело"
-          value={`${minutesToHours(bodyMinutes)} ч`}
-          progress={progressPercent(bodyMinutes, TARGETS.weeklyBodyMinutes)}
+          label="Дефицит тела"
+          value={bodyEnergyDays.length ? `${formatSignedKcal(totalDeficit)} ккал` : "-"}
+          progress={progressPercent(Math.max(0, totalDeficit), TARGETS.weeklyBodyDeficitKcal)}
         />
         <MetricCard
           icon={<Flame className="h-5 w-5" />}
@@ -138,6 +142,8 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
               <LineMetric label="Калории" value={caloriesAverage ? `${caloriesAverage} ккал` : "-"} />
               <LineMetric label="Белок" value={proteinAverage ? `${proteinAverage} г` : "-"} />
               <LineMetric label="Активность" value={activeAverage ? `${activeAverage} ккал` : "-"} />
+              <LineMetric label="Средний дефицит" value={bodyEnergyDays.length ? `${formatSignedKcal(averageDeficit)} ккал` : "-"} />
+              <LineMetric label="Часы тела" value={`${minutesToHours(bodyMinutes)} ч`} />
               <LineMetric label="Тренировки" value={String(workouts)} />
               <LineMetric label="Дни без алкоголя" value={String(noAlcoholDays)} />
               <LineMetric label="Дни без зажора" value={String(noBingeDays)} />
@@ -161,6 +167,7 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
                 <th className="px-4 py-3">Профессия</th>
                 <th className="px-4 py-3">Тело</th>
                 <th className="px-4 py-3">Ккал</th>
+                <th className="px-4 py-3">Дефицит</th>
                 <th className="px-4 py-3">Белок</th>
                 <th className="px-4 py-3">Активность</th>
               </tr>
@@ -169,6 +176,7 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
               {weekDays.map((day) => {
                 const dayEntries = weekEntries.filter((entry) => entry.date === day.date);
                 const score = calculateDayScore(day, dayEntries);
+                const bodyEnergy = calculateBodyEnergy(day);
                 return (
                   <tr key={day.date}>
                     <td className="px-4 py-3 font-semibold">
@@ -184,6 +192,9 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
                     <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.group === "profession"))}</td>
                     <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.group === "body"))}</td>
                     <td className="px-4 py-3">{day.calories ?? "-"}</td>
+                    <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
+                      {bodyEnergy.hasData ? formatSignedKcal(bodyEnergy.deficit) : "-"}
+                    </td>
                     <td className="px-4 py-3">{day.proteinGrams ?? "-"}</td>
                     <td className="px-4 py-3">{day.activeKcal ?? "-"}</td>
                   </tr>

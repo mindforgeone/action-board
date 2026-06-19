@@ -1,5 +1,6 @@
 import { DEFAULT_TIMER_CATEGORIES } from "../constants";
 import type { AppSettings, DayRecord, Goal, Period, TimeEntry, TimerCategory } from "../types";
+import { calculateBodyEnergy } from "./bodyEnergy";
 import { isDateInPeriod } from "./date";
 import { calculateDayScore, sumMinutes } from "./scoring";
 
@@ -27,6 +28,8 @@ export function summarizePeriod(
   let proteinCount = 0;
   let activeTotal = 0;
   let activeCount = 0;
+  let deficitTotal = 0;
+  let deficitCount = 0;
   let workouts = 0;
   let noAlcoholDays = 0;
   let noBingeDays = 0;
@@ -49,6 +52,11 @@ export function summarizePeriod(
     if (typeof day.activeKcal === "number") {
       activeTotal += day.activeKcal;
       activeCount += 1;
+    }
+    const bodyEnergy = calculateBodyEnergy(day);
+    if (bodyEnergy.hasData) {
+      deficitTotal += bodyEnergy.deficit;
+      deficitCount += 1;
     }
     if (day.workout) workouts += 1;
     if (day.alcohol === false) noAlcoholDays += 1;
@@ -86,6 +94,8 @@ export function summarizePeriod(
     averageCalories: caloriesCount ? Math.round(caloriesTotal / caloriesCount) : 0,
     averageProtein: proteinCount ? Math.round(proteinTotal / proteinCount) : 0,
     averageActiveKcal: activeCount ? Math.round(activeTotal / activeCount) : 0,
+    averageDeficitKcal: deficitCount ? Math.round(deficitTotal / deficitCount) : 0,
+    totalDeficitKcal: Math.round(deficitTotal),
     workouts,
     noAlcoholDays,
     noBingeDays,
@@ -158,6 +168,7 @@ export function toCsv(payload: ExportPayload): string {
   payload.days.forEach((day) => {
     const dayEntries = payload.timeEntries.filter((entry) => entry.date === day.date);
     const score = calculateDayScore(day, dayEntries);
+    const bodyEnergy = calculateBodyEnergy(day);
     rows.push([
       "day",
       day.date,
@@ -170,7 +181,10 @@ export function toCsv(payload: ExportPayload): string {
       String(day.weightKg ?? ""),
       JSON.stringify({
         proteinGrams: day.proteinGrams,
+        basalMetabolismKcal: day.basalMetabolismKcal,
         activeKcal: day.activeKcal,
+        burnedKcal: bodyEnergy.hasData ? bodyEnergy.burned : undefined,
+        deficitKcal: bodyEnergy.hasData ? bodyEnergy.deficit : undefined,
         steps: day.steps,
         sleepHours: day.sleepHours,
         workout: day.workout,

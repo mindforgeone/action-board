@@ -1,6 +1,7 @@
 import { Filter, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { DayRecord, DayStatusKey, TimeEntry, TimerCategory } from "../types";
+import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import { formatDate, minutesToHours } from "../utils/date";
 import { calculateDayScore, sumMinutes } from "../utils/scoring";
 
@@ -110,6 +111,7 @@ export function HistoryView({ days, entries, categories }: HistoryViewProps) {
                   <th className="px-4 py-3">Очки</th>
                   <th className="px-4 py-3">1С</th>
                   <th className="px-4 py-3">Калории</th>
+                  <th className="px-4 py-3">Дефицит</th>
                   <th className="px-4 py-3">Активные ккал</th>
                   <th className="px-4 py-3">Вес</th>
                   <th className="px-4 py-3">Артефакт</th>
@@ -117,25 +119,31 @@ export function HistoryView({ days, entries, categories }: HistoryViewProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {rows.map((row) => (
-                  <tr key={row.date}>
-                    <td className="px-4 py-3 font-semibold">{formatDate(row.date)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex min-w-28 rounded-md border px-2 py-1 text-xs font-black ${row.score.statusClass}`}>
-                        {row.score.statusLabel}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 font-black">{row.score.points}</td>
-                    <td className="px-4 py-3">
-                      {minutesToHours(sumMinutes(row.entries, (entry) => entry.categoryId === "skillbox-1c"))} ч
-                    </td>
-                    <td className="px-4 py-3">{row.day.calories ?? "-"}</td>
-                    <td className="px-4 py-3">{row.day.activeKcal ?? "-"}</td>
-                    <td className="px-4 py-3">{row.day.weightKg ?? "-"}</td>
-                    <td className="max-w-xs px-4 py-3 text-slate-600">{row.day.artifact || "-"}</td>
-                    <td className="max-w-xs px-4 py-3 text-slate-600">{row.day.reflection || "-"}</td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const bodyEnergy = calculateBodyEnergy(row.day);
+                  return (
+                    <tr key={row.date}>
+                      <td className="px-4 py-3 font-semibold">{formatDate(row.date)}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex min-w-28 rounded-md border px-2 py-1 text-xs font-black ${row.score.statusClass}`}>
+                          {row.score.statusLabel}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-black">{row.score.points}</td>
+                      <td className="px-4 py-3">
+                        {minutesToHours(sumMinutes(row.entries, (entry) => entry.categoryId === "skillbox-1c"))} ч
+                      </td>
+                      <td className="px-4 py-3">{row.day.calories ?? "-"}</td>
+                      <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
+                        {bodyEnergy.hasData ? formatSignedKcal(bodyEnergy.deficit) : "-"}
+                      </td>
+                      <td className="px-4 py-3">{row.day.activeKcal ?? "-"}</td>
+                      <td className="px-4 py-3">{row.day.weightKg ?? "-"}</td>
+                      <td className="max-w-xs px-4 py-3 text-slate-600">{row.day.artifact || "-"}</td>
+                      <td className="max-w-xs px-4 py-3 text-slate-600">{row.day.reflection || "-"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

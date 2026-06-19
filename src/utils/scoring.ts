@@ -1,5 +1,6 @@
 import { DEFAULT_TIMER_CATEGORIES } from "../constants";
 import type { DayRecord, DayScore, DayStatusKey, TimeEntry, TimerCategory } from "../types";
+import { BODY_DEFICIT_TARGET, calculateBodyEnergy } from "./bodyEnergy";
 
 export function sumMinutes(
   entries: TimeEntry[],
@@ -80,6 +81,23 @@ export function calculateDayScore(day: DayRecord | undefined, entries: TimeEntry
   if (record.nutritionInRange) {
     bodyPoints += 2;
     reasons.push("Калории в коридоре: +2");
+  }
+
+  const bodyEnergy = calculateBodyEnergy(record);
+  if (
+    bodyEnergy.hasData &&
+    bodyEnergy.deficit >= BODY_DEFICIT_TARGET.idealMin &&
+    bodyEnergy.deficit <= BODY_DEFICIT_TARGET.idealMax
+  ) {
+    bodyPoints += 3;
+    reasons.push("Дефицит 450-700 ккал: +3");
+  } else if (
+    bodyEnergy.hasData &&
+    bodyEnergy.deficit >= BODY_DEFICIT_TARGET.min &&
+    bodyEnergy.deficit <= BODY_DEFICIT_TARGET.max
+  ) {
+    bodyPoints += 2;
+    reasons.push("Рабочий дефицит 300-850 ккал: +2");
   }
 
   if ((record.proteinGrams ?? 0) >= 120) {
