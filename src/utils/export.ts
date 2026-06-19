@@ -1,5 +1,5 @@
-import { TIMER_CATEGORIES } from "../constants";
-import type { DayRecord, Goal, Period, TimeEntry } from "../types";
+import { DEFAULT_TIMER_CATEGORIES } from "../constants";
+import type { AppSettings, DayRecord, Goal, Period, TimeEntry, TimerCategory } from "../types";
 import { isDateInPeriod } from "./date";
 import { calculateDayScore, sumMinutes } from "./scoring";
 
@@ -12,9 +12,14 @@ export type ExportPayload = {
   days: DayRecord[];
   timeEntries: TimeEntry[];
   goals: Goal[];
+  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds">;
 };
 
-export function summarizePeriod(days: DayRecord[], entries: TimeEntry[]) {
+export function summarizePeriod(
+  days: DayRecord[],
+  entries: TimeEntry[],
+  categories: TimerCategory[] = DEFAULT_TIMER_CATEGORIES,
+) {
   const statusCounts = { red: 0, yellow: 0, green: 0, combat: 0 };
   let caloriesTotal = 0;
   let caloriesCount = 0;
@@ -50,12 +55,26 @@ export function summarizePeriod(days: DayRecord[], entries: TimeEntry[]) {
     if (day.binge === false) noBingeDays += 1;
   });
 
-  const byCategory = TIMER_CATEGORIES.map((category) => ({
-    categoryId: category.id,
-    category: category.name,
-    group: category.group,
-    minutes: sumMinutes(entries, (entry) => entry.categoryId === category.id),
-  })).filter((row) => row.minutes > 0);
+  const categoriesById = new Map(categories.map((category) => [category.id, category]));
+  entries.forEach((entry) => {
+    if (!categoriesById.has(entry.categoryId)) {
+      categoriesById.set(entry.categoryId, {
+        id: entry.categoryId,
+        name: entry.category,
+        group: entry.group,
+        description: "",
+      });
+    }
+  });
+
+  const byCategory = Array.from(categoriesById.values())
+    .map((category) => ({
+      categoryId: category.id,
+      category: category.name,
+      group: category.group,
+      minutes: sumMinutes(entries, (entry) => entry.categoryId === category.id),
+    }))
+    .filter((row) => row.minutes > 0);
 
   return {
     daysCount: days.length,
@@ -79,6 +98,7 @@ export function buildExportPayload(
   entries: TimeEntry[],
   goals: Goal[],
   period: Period,
+  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds">,
 ): ExportPayload {
   const periodDays = Object.values(daysMap)
     .filter((day) => isDateInPeriod(day.date, period.from, period.to))
@@ -92,10 +112,11 @@ export function buildExportPayload(
     version: 1,
     generatedAt: new Date().toISOString(),
     period,
-    summary: summarizePeriod(periodDays, periodEntries),
+    summary: summarizePeriod(periodDays, periodEntries, settings?.timerCategories),
     days: periodDays,
     timeEntries: periodEntries,
     goals,
+    settings,
   };
 }
 

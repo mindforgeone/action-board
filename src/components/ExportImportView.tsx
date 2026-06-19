@@ -1,6 +1,6 @@
 import { Download, FileJson, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
-import type { DayRecord, Goal, TimeEntry } from "../types";
+import type { AppSettings, DayRecord, Goal, TimeEntry } from "../types";
 import { getMonthRange, getWeekRange, localDateKey } from "../utils/date";
 import { buildExportPayload, downloadReport, toCsv } from "../utils/export";
 
@@ -8,12 +8,13 @@ type ExportImportViewProps = {
   days: Record<string, DayRecord>;
   entries: TimeEntry[];
   goals: Goal[];
+  settings: Pick<AppSettings, "timerCategories" | "visibleMetricIds">;
   onImportData: (payload: unknown) => Promise<void>;
 };
 
 type ExportFormat = "json" | "csv";
 
-export function ExportImportView({ days, entries, goals, onImportData }: ExportImportViewProps) {
+export function ExportImportView({ days, entries, goals, settings, onImportData }: ExportImportViewProps) {
   const [format, setFormat] = useState<ExportFormat>("json");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -31,7 +32,7 @@ export function ExportImportView({ days, entries, goals, onImportData }: ExportI
       label,
       from: periodFrom,
       to: periodTo,
-    });
+    }, settings);
     const suffix = label.toLowerCase().replace(/[^a-zа-я0-9]+/gi, "-");
     const baseName = `action-board-${suffix}-${localDateKey()}`;
 

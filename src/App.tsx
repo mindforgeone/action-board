@@ -96,6 +96,15 @@ export default function App() {
     });
   }
 
+  async function deleteTimerCategory(categoryId: string) {
+    await data.deleteTimerCategory(categoryId);
+    setActiveTimers((current) => {
+      const next = { ...current };
+      delete next[categoryId];
+      return next;
+    });
+  }
+
   if (auth.loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-700">
@@ -144,15 +153,26 @@ export default function App() {
       {activeScreen === "today" && (
         <TodayView
           activeTimers={activeTimers}
+          categories={data.settings.timerCategories}
           dateKey={todayKey}
           day={data.days[todayKey]}
           entries={todayEntries}
           now={now}
+          visibleMetricIds={data.settings.visibleMetricIds}
+          onDeleteCategory={deleteTimerCategory}
           onSaveDay={data.saveDay}
           onToggleTimer={toggleTimer}
+          onUpdateVisibleMetricIds={data.updateVisibleMetricIds}
+          onUpsertCategory={data.upsertTimerCategory}
         />
       )}
-      {activeScreen === "week" && <WeekView days={data.days} entries={data.timeEntries} />}
+      {activeScreen === "week" && (
+        <WeekView
+          categories={data.settings.timerCategories}
+          days={data.days}
+          entries={data.timeEntries}
+        />
+      )}
       {activeScreen === "goals" && (
         <GoalsView
           goals={data.goals}
@@ -162,13 +182,21 @@ export default function App() {
         />
       )}
       {activeScreen === "history" && (
-        <HistoryView days={data.days} entries={data.timeEntries} />
+        <HistoryView
+          categories={data.settings.timerCategories}
+          days={data.days}
+          entries={data.timeEntries}
+        />
       )}
       {activeScreen === "export" && (
         <ExportImportView
           days={data.days}
           entries={data.timeEntries}
           goals={data.goals}
+          settings={{
+            timerCategories: data.settings.timerCategories,
+            visibleMetricIds: data.settings.visibleMetricIds,
+          }}
           onImportData={data.importData}
         />
       )}

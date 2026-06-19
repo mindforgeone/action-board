@@ -11,14 +11,15 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DEFAULT_GOALS } from "../constants";
+import { DEFAULT_APP_SETTINGS, DEFAULT_GOALS } from "../constants";
 import { db } from "../firebase";
-import type { DayRecord, Goal, TimeEntry } from "../types";
+import type { AppSettings, DayRecord, Goal, TimerCategory, TimeEntry } from "../types";
 
 type ImportablePayload = {
   days?: DayRecord[];
   timeEntries?: TimeEntry[];
   goals?: Goal[];
+  settings?: Partial<AppSettings>;
 };
 
 function nowIso() {
@@ -39,6 +40,22 @@ function normalizeImportPayload(payload: unknown): ImportablePayload {
     days: Array.isArray(source.days) ? source.days : [],
     timeEntries: Array.isArray(source.timeEntries) ? source.timeEntries : [],
     goals: Array.isArray(source.goals) ? source.goals : [],
+    settings: source.settings && typeof source.settings === "object" ? source.settings : undefined,
+  };
+}
+
+function normalizeSettings(data: Partial<AppSettings> | undefined): AppSettings {
+  return {
+    timerCategories:
+      Array.isArray(data?.timerCategories) && data.timerCategories.length > 0
+        ? data.timerCategories
+        : DEFAULT_APP_SETTINGS.timerCategories,
+    visibleMetricIds:
+      Array.isArray(data?.visibleMetricIds) && data.visibleMetricIds.length > 0
+        ? data.visibleMetricIds
+        : DEFAULT_APP_SETTINGS.visibleMetricIds,
+    createdAt: data?.createdAt,
+    updatedAt: data?.updatedAt,
   };
 }
 
@@ -46,9 +63,11 @@ export function useActionBoardData(user: User | null) {
   const [days, setDays] = useState<Record<string, DayRecord>>({});
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const seededGoalsFor = useRef<string>("");
+  const seededSettingsFor = useRef<string>("");
 
   useEffect(() => {
     const firestore = db;
@@ -56,6 +75,7 @@ export function useActionBoardData(user: User | null) {
       setDays({});
       setTimeEntries([]);
       setGoals([]);
+      setSettings(DEFAULT_APP_SETTINGS);
       setLoading(false);
       return;
     }
@@ -70,6 +90,7 @@ export function useActionBoardData(user: User | null) {
       orderBy("startTime", "desc"),
     );
     const goalsRef = query(collection(firestore, "users", userId, "goals"), orderBy("createdAt", "asc"));
+    const settingsRef = doc(firestore, "users", userId, "settings", "main");
 
     const unsubs = [
       onSnapshot(
@@ -131,6 +152,35 @@ export function useActionBoardData(user: User | null) {
               id: item.id,
             })),
           );
+          setLoading(false);
+        },
+        (snapshotError) => {
+          setError(snapshotError.message);
+          setLoading(false);
+        },
+      ),
+      onSnapshot(
+        settingsRef,
+        (snapshot) => {
+          if (!snapshot.exists() && seededSettingsFor.current !== userId) {
+            seededSettingsFor.current = userId;
+            const timestamp = nowIso();
+            const initialSettings = {
+              ...DEFAULT_APP_SETTINGS,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            };
+            setSettings(initialSettings);
+            void setDoc(settingsRef, initialSettings).catch((settingsError: unknown) => {
+              const message =
+                settingsError instanceof Error ? settingsError.message : "Не удалось создать настройки.";
+              setError(message);
+            });
+            setLoading(false);
+            return;
+          }
+
+          setSettings(normalizeSettings(snapshot.data() as Partial<AppSettings> | undefined));
           setLoading(false);
         },
         (snapshotError) => {
@@ -229,6 +279,64 @@ export function useActionBoardData(user: User | null) {
     [user],
   );
 
+  const saveSettings = useCallback(
+    async (patch: Partial<AppSettings>) => {
+      const firestore = db;
+      if (!firestore || !user) return;
+      const timestamp = nowIso();
+
+      await setDoc(
+        doc(firestore, "users", user.uid, "settings", "main"),
+        {
+          ...patch,
+          createdAt: settings.createdAt ?? timestamp,
+          updatedAt: timestamp,
+        },
+        { merge: true },
+      );
+    },
+    [settings.createdAt, user],
+  );
+
+  const upsertTimerCategory = useCallback(
+    async (category: TimerCategory | Omit<TimerCategory, "id">) => {
+      const id = "id" in category ? category.id : `custom-${crypto.randomUUID()}`;
+      const nextCategory: TimerCategory = {
+        id,
+        name: category.name.trim(),
+        group: category.group,
+        description: category.description.trim(),
+        system: "system" in category ? category.system : false,
+      };
+
+      if (!nextCategory.name) return;
+
+      const exists = settings.timerCategories.some((item) => item.id === id);
+      const timerCategories = exists
+        ? settings.timerCategories.map((item) => (item.id === id ? nextCategory : item))
+        : [...settings.timerCategories, nextCategory];
+
+      await saveSettings({ timerCategories });
+    },
+    [saveSettings, settings.timerCategories],
+  );
+
+  const deleteTimerCategory = useCallback(
+    async (categoryId: string) => {
+      await saveSettings({
+        timerCategories: settings.timerCategories.filter((category) => category.id !== categoryId),
+      });
+    },
+    [saveSettings, settings.timerCategories],
+  );
+
+  const updateVisibleMetricIds = useCallback(
+    async (visibleMetricIds: string[]) => {
+      await saveSettings({ visibleMetricIds });
+    },
+    [saveSettings],
+  );
+
   const importData = useCallback(
     async (payload: unknown) => {
       const firestore = db;
@@ -278,6 +386,17 @@ export function useActionBoardData(user: User | null) {
         );
       });
 
+      if (normalized.settings) {
+        batch.set(
+          doc(firestore, "users", userId, "settings", "main"),
+          {
+            ...normalized.settings,
+            updatedAt: timestamp,
+          },
+          { merge: true },
+        );
+      }
+
       await batch.commit();
     },
     [user],
@@ -287,6 +406,7 @@ export function useActionBoardData(user: User | null) {
     days,
     timeEntries,
     goals,
+    settings,
     loading,
     error,
     saveDay,
@@ -294,6 +414,10 @@ export function useActionBoardData(user: User | null) {
     upsertGoal,
     updateGoal,
     deleteGoal,
+    saveSettings,
+    upsertTimerCategory,
+    deleteTimerCategory,
+    updateVisibleMetricIds,
     importData,
   };
 }

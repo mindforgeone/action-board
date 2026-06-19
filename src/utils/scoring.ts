@@ -1,5 +1,5 @@
-import { TIMER_CATEGORIES } from "../constants";
-import type { DayRecord, DayScore, DayStatusKey, TimeEntry } from "../types";
+import { DEFAULT_TIMER_CATEGORIES } from "../constants";
+import type { DayRecord, DayScore, DayStatusKey, TimeEntry, TimerCategory } from "../types";
 
 export function sumMinutes(
   entries: TimeEntry[],
@@ -129,8 +129,11 @@ export function calculateDayScore(day: DayRecord | undefined, entries: TimeEntry
   };
 }
 
-export function categoryName(categoryId: string): string {
-  return TIMER_CATEGORIES.find((category) => category.id === categoryId)?.name ?? categoryId;
+export function categoryName(
+  categoryId: string,
+  categories: TimerCategory[] = DEFAULT_TIMER_CATEGORIES,
+): string {
+  return categories.find((category) => category.id === categoryId)?.name ?? categoryId;
 }
 
 export function progressPercent(current: number, target: number): number {

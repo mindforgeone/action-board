@@ -2,12 +2,14 @@ export type CategoryGroup = "profession" | "body" | "work" | "other";
 export type GoalType = "profession" | "body" | "market" | "custom";
 export type GoalStatus = "active" | "done" | "paused";
 export type DayStatusKey = "red" | "yellow" | "green" | "combat";
+export type QuickMetricKind = "number" | "boolean" | "text";
 
 export type TimerCategory = {
   id: string;
   name: string;
   group: CategoryGroup;
   description: string;
+  system?: boolean;
 };
 
 export type DayRecord = {
@@ -80,4 +82,21 @@ export type DayScore = {
   statusLabel: string;
   statusClass: string;
   reasons: string[];
+};
+
+export type QuickMetricDefinition = {
+  id: string;
+  field: keyof DayRecord;
+  label: string;
+  kind: QuickMetricKind;
+  min?: string;
+  max?: string;
+  step?: string;
+};
+
+export type AppSettings = {
+  timerCategories: TimerCategory[];
+  visibleMetricIds: string[];
+  createdAt?: string;
+  updatedAt?: string;
 };

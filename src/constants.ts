@@ -1,85 +1,100 @@
-import type { Goal, TimerCategory } from "./types";
+import type { AppSettings, Goal, QuickMetricDefinition, TimerCategory } from "./types";
 
-export const TIMER_CATEGORIES: TimerCategory[] = [
+export const DEFAULT_TIMER_CATEGORIES: TimerCategory[] = [
   {
     id: "skillbox-1c",
     name: "1С Skillbox",
     group: "profession",
     description: "Учебные блоки, конспекты, задачи и разборы Skillbox.",
+    system: true,
   },
   {
     id: "practice-final",
     name: "Практика / финальная работа",
     group: "profession",
     description: "Практические задания и сдача финальной работы.",
+    system: true,
   },
   {
     id: "pet-construction",
     name: "Пет-проект Строительная бригада",
     group: "profession",
     description: "Функции, архитектура, интерфейсы и демонстрация проекта.",
+    system: true,
   },
   {
     id: "interview-questions",
     name: "Вопросы к собеседованию",
     group: "profession",
     description: "Теория, карточки, ответы вслух и повторение.",
+    system: true,
   },
   {
     id: "livecoding-1c",
     name: "Лайвкодинг 1С",
     group: "profession",
     description: "Решение задач руками в ограниченное время.",
+    system: true,
   },
   {
     id: "resume-market",
     name: "Резюме / HR / рынок",
     group: "profession",
     description: "Резюме, отклики, вакансии, HR-переписка и рынок.",
+    system: true,
   },
   {
     id: "current-job",
     name: "Текущая работа",
     group: "work",
     description: "Время, которое забирает текущая работа.",
+    system: true,
   },
   {
     id: "gym",
     name: "Зал",
     group: "body",
     description: "Силовая тренировка или полноценная работа в зале.",
+    system: true,
   },
   {
     id: "walking",
     name: "Ходьба",
     group: "body",
     description: "Шаги, прогулки, целевая активность.",
+    system: true,
   },
   {
     id: "bike",
     name: "Велосипед",
     group: "body",
     description: "Велотренировка или поездки как активность.",
+    system: true,
   },
   {
     id: "stretching",
     name: "Растяжка / восстановление",
     group: "body",
     description: "Мобилити, растяжка, восстановление, легкая активность.",
+    system: true,
   },
   {
     id: "household",
     name: "Бытовые дела",
     group: "other",
     description: "Дом, документы, бытовые задачи.",
+    system: true,
   },
   {
     id: "rest",
     name: "Отдых",
     group: "other",
     description: "Осознанный отдых без маскировки прокрастинации.",
+    system: true,
   },
 ];
+
+export const TIMER_CATEGORIES = DEFAULT_TIMER_CATEGORIES;
 
 export const GROUP_LABELS = {
   profession: "Профессия",
@@ -87,6 +102,98 @@ export const GROUP_LABELS = {
   work: "Работа",
   other: "Прочее",
 } as const;
+
+export const QUICK_METRICS: QuickMetricDefinition[] = [
+  {
+    id: "calories",
+    field: "calories",
+    label: "Калории съедено",
+    kind: "number",
+  },
+  {
+    id: "proteinGrams",
+    field: "proteinGrams",
+    label: "Белок, г",
+    kind: "number",
+  },
+  {
+    id: "activeKcal",
+    field: "activeKcal",
+    label: "Активные ккал",
+    kind: "number",
+  },
+  {
+    id: "steps",
+    field: "steps",
+    label: "Шаги",
+    kind: "number",
+  },
+  {
+    id: "weightKg",
+    field: "weightKg",
+    label: "Вес",
+    kind: "number",
+    step: "0.1",
+  },
+  {
+    id: "sleepHours",
+    field: "sleepHours",
+    label: "Сон, часов",
+    kind: "number",
+    step: "0.25",
+  },
+  {
+    id: "energy",
+    field: "energy",
+    label: "Энергия 1-5",
+    kind: "number",
+    min: "1",
+    max: "5",
+  },
+  {
+    id: "alcohol",
+    field: "alcohol",
+    label: "Алкоголь",
+    kind: "boolean",
+  },
+  {
+    id: "binge",
+    field: "binge",
+    label: "Зажор",
+    kind: "boolean",
+  },
+  {
+    id: "workout",
+    field: "workout",
+    label: "Тренировка",
+    kind: "boolean",
+  },
+  {
+    id: "nutritionInRange",
+    field: "nutritionInRange",
+    label: "Питание в коридоре",
+    kind: "boolean",
+  },
+  {
+    id: "workBefore1730Opened",
+    field: "workBefore1730Opened",
+    label: "Работа до 17:30 открывалась",
+    kind: "boolean",
+  },
+  {
+    id: "note",
+    field: "note",
+    label: "Заметка дня",
+    kind: "text",
+  },
+];
+
+export const DEFAULT_VISIBLE_METRIC_IDS = QUICK_METRICS.map((metric) => metric.id);
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  timerCategories: DEFAULT_TIMER_CATEGORIES,
+  visibleMetricIds: DEFAULT_VISIBLE_METRIC_IDS,
+};
 
 export const DEFAULT_GOALS: Omit<Goal, "userId" | "createdAt" | "updatedAt">[] = [
   {

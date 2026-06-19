@@ -1,15 +1,16 @@
 import { Activity, BriefcaseBusiness, Dumbbell, Flame, TimerReset } from "lucide-react";
-import { TARGETS, TIMER_CATEGORIES } from "../constants";
-import type { DayRecord, TimeEntry } from "../types";
+import { TARGETS } from "../constants";
+import type { DayRecord, TimeEntry, TimerCategory } from "../types";
 import { formatShortDate, formatWeekday, getWeekRange, minutesToHours } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
 
 type WeekViewProps = {
   days: Record<string, DayRecord>;
   entries: TimeEntry[];
+  categories: TimerCategory[];
 };
 
-export function WeekView({ days, entries }: WeekViewProps) {
+export function WeekView({ days, entries, categories }: WeekViewProps) {
   const week = getWeekRange();
   const weekDays = week.days.map((date) => days[date] ?? { date });
   const weekEntries = entries.filter((entry) => entry.date >= week.from && entry.date <= week.to);
@@ -36,7 +37,7 @@ export function WeekView({ days, entries }: WeekViewProps) {
   const noAlcoholDays = weekDays.filter((day) => day.alcohol === false).length;
   const noBingeDays = weekDays.filter((day) => day.binge === false).length;
 
-  const byCategory = TIMER_CATEGORIES.map((category) => ({
+  const byCategory = categories.map((category) => ({
     ...category,
     minutes: sumMinutes(weekEntries, (entry) => entry.categoryId === category.id),
   })).filter((item) => item.minutes > 0);

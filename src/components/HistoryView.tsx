@@ -1,13 +1,13 @@
 import { Filter, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { TIMER_CATEGORIES } from "../constants";
-import type { DayRecord, DayStatusKey, TimeEntry } from "../types";
+import type { DayRecord, DayStatusKey, TimeEntry, TimerCategory } from "../types";
 import { formatDate, minutesToHours } from "../utils/date";
 import { calculateDayScore, sumMinutes } from "../utils/scoring";
 
 type HistoryViewProps = {
   days: Record<string, DayRecord>;
   entries: TimeEntry[];
+  categories: TimerCategory[];
 };
 
 const STATUS_OPTIONS: Array<{ value: DayStatusKey | ""; label: string }> = [
@@ -18,7 +18,7 @@ const STATUS_OPTIONS: Array<{ value: DayStatusKey | ""; label: string }> = [
   { value: "combat", label: "Боевые" },
 ];
 
-export function HistoryView({ days, entries }: HistoryViewProps) {
+export function HistoryView({ days, entries, categories }: HistoryViewProps) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [status, setStatus] = useState<DayStatusKey | "">("");
@@ -78,7 +78,7 @@ export function HistoryView({ days, entries }: HistoryViewProps) {
             Категория
             <select className="field mt-2" value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
               <option value="">Все категории</option>
-              {TIMER_CATEGORIES.map((category) => (
+              {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
                 </option>
