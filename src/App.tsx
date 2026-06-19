@@ -77,7 +77,8 @@ export default function App() {
 
     const end = new Date();
     const start = new Date(active.startedAt);
-    const durationMinutes = Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
+    const durationSeconds = Math.max(1, Math.round((end.getTime() - start.getTime()) / 1000));
+    const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
 
     await data.addTimeEntry({
       date: localDateKey(start),
@@ -87,6 +88,7 @@ export default function App() {
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       durationMinutes,
+      durationSeconds,
     });
 
     setActiveTimers((current) => {
@@ -161,6 +163,7 @@ export default function App() {
           entries={todayEntries}
           now={now}
           visibleMetricIds={data.settings.visibleMetricIds}
+          onAddManualTimeEntry={data.addTimeEntry}
           onDeleteCategory={deleteTimerCategory}
           onSaveDay={data.saveDay}
           onToggleTimer={toggleTimer}

@@ -1,8 +1,9 @@
-import { Activity, BriefcaseBusiness, Dumbbell, Flame, TimerReset } from "lucide-react";
+import { Activity, BriefcaseBusiness, Dumbbell, Flame, GraduationCap, TimerReset } from "lucide-react";
+import { useMemo, useState } from "react";
 import { TARGETS } from "../constants";
 import type { BodyProfile, DayRecord, TimeEntry, TimerCategory } from "../types";
 import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
-import { formatShortDate, formatWeekday, getWeekRange, minutesToHours } from "../utils/date";
+import { formatShortDate, formatWeekday, getMonthRange, getWeekRange, localDateKey, minutesToHours } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
 
 type WeekViewProps = {
@@ -12,39 +13,51 @@ type WeekViewProps = {
   bodyProfile: BodyProfile;
 };
 
-export function WeekView({ days, entries, categories, bodyProfile }: WeekViewProps) {
-  const week = getWeekRange();
-  const weekDays = week.days.map((date) => days[date] ?? { date });
-  const weekEntries = entries.filter((entry) => entry.date >= week.from && entry.date <= week.to);
+type PeriodMode = "week" | "month";
 
-  const oneCMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "skillbox-1c");
-  const practiceMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "practice-final");
-  const petMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "pet-construction");
-  const currentWorkMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "current-job");
-  const bodyMinutes = sumMinutes(weekEntries, (entry) => entry.group === "body");
-  const bodyEnergyDays = weekDays.map((day) => calculateBodyEnergy(day, bodyProfile)).filter((day) => day.hasData);
+export function WeekView({ days, entries, categories, bodyProfile }: WeekViewProps) {
+  const [periodMode, setPeriodMode] = useState<PeriodMode>("week");
+  const period = useMemo(() => {
+    if (periodMode === "week") return getWeekRange();
+    const month = getMonthRange();
+    return {
+      ...month,
+      days: daysBetween(month.from, month.to),
+    };
+  }, [periodMode]);
+  const periodFactor = period.days.length / 7;
+  const periodDays = period.days.map((date) => days[date] ?? { date });
+  const periodEntries = entries.filter((entry) => entry.date >= period.from && entry.date <= period.to);
+
+  const oneCMinutes = sumMinutes(periodEntries, (entry) => entry.categoryId === "skillbox-1c");
+  const practiceMinutes = sumMinutes(periodEntries, (entry) => entry.categoryId === "practice-final");
+  const petMinutes = sumMinutes(periodEntries, (entry) => entry.categoryId === "pet-construction");
+  const professionMinutes = sumMinutes(periodEntries, (entry) => entry.group === "profession");
+  const currentWorkMinutes = sumMinutes(periodEntries, (entry) => entry.categoryId === "current-job");
+  const bodyMinutes = sumMinutes(periodEntries, (entry) => entry.group === "body");
+  const bodyEnergyDays = periodDays.map((day) => calculateBodyEnergy(day, bodyProfile)).filter((day) => day.hasData);
   const totalDeficit = bodyEnergyDays.reduce((sum, day) => sum + day.deficit, 0);
   const averageDeficit = bodyEnergyDays.length ? Math.round(totalDeficit / bodyEnergyDays.length) : 0;
 
   const statusCounts = { red: 0, yellow: 0, green: 0, combat: 0 };
-  weekDays.forEach((day) => {
+  periodDays.forEach((day) => {
     const score = calculateDayScore(
       day,
-      weekEntries.filter((entry) => entry.date === day.date),
+      periodEntries.filter((entry) => entry.date === day.date),
     );
     statusCounts[score.statusKey] += 1;
   });
 
-  const caloriesAverage = average(weekDays.map((day) => day.calories));
-  const proteinAverage = average(weekDays.map((day) => day.proteinGrams));
-  const activeAverage = average(weekDays.map((day) => day.activeKcal));
-  const workouts = weekDays.filter((day) => day.workout).length;
-  const noAlcoholDays = weekDays.filter((day) => day.alcohol === false).length;
-  const noBingeDays = weekDays.filter((day) => day.binge === false).length;
+  const caloriesAverage = average(periodDays.map((day) => day.calories));
+  const proteinAverage = average(periodDays.map((day) => day.proteinGrams));
+  const activeAverage = average(periodDays.map((day) => day.activeKcal));
+  const workouts = periodDays.filter((day) => day.workout).length;
+  const noAlcoholDays = periodDays.filter((day) => day.alcohol === false).length;
+  const noBingeDays = periodDays.filter((day) => day.binge === false).length;
 
   const byCategory = categories.map((category) => ({
     ...category,
-    minutes: sumMinutes(weekEntries, (entry) => entry.categoryId === category.id),
+    minutes: sumMinutes(periodEntries, (entry) => entry.categoryId === category.id),
   })).filter((item) => item.minutes > 0);
   const maxCategoryMinutes = Math.max(1, ...byCategory.map((item) => item.minutes));
 
@@ -54,48 +67,72 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Неделя
+              Аналитика
             </p>
             <h1 className="mt-2 text-3xl font-black tracking-normal">
-              {formatShortDate(week.from)} - {formatShortDate(week.to)}
+              {formatShortDate(period.from)} - {formatShortDate(period.to)}
             </h1>
           </div>
-          <p className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-            {minutesToHours(weekEntries.reduce((sum, entry) => sum + entry.durationMinutes, 0))} ч всего
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1">
+              <button
+                className={`btn ${periodMode === "week" ? "bg-slate-950 text-white" : "text-slate-700"}`}
+                type="button"
+                onClick={() => setPeriodMode("week")}
+              >
+                Неделя
+              </button>
+              <button
+                className={`btn ${periodMode === "month" ? "bg-slate-950 text-white" : "text-slate-700"}`}
+                type="button"
+                onClick={() => setPeriodMode("month")}
+              >
+                Месяц
+              </button>
+            </div>
+            <p className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+              {minutesToHours(sumMinutes(periodEntries, () => true))} ч всего
+            </p>
+          </div>
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        <MetricCard
+          icon={<GraduationCap className="h-5 w-5" />}
+          label="Профессия всего"
+          value={`${minutesToHours(professionMinutes)} ч`}
+          progress={progressPercent(professionMinutes, TARGETS.dailyProfessionMinutes * period.days.length)}
+        />
         <MetricCard
           icon={<BriefcaseBusiness className="h-5 w-5" />}
           label="1С Skillbox"
           value={`${minutesToHours(oneCMinutes)} ч`}
-          progress={progressPercent(oneCMinutes, TARGETS.weeklyOneCMinutes)}
+          progress={progressPercent(oneCMinutes, TARGETS.weeklyOneCMinutes * periodFactor)}
         />
         <MetricCard
           icon={<TimerReset className="h-5 w-5" />}
           label="Практика"
           value={`${minutesToHours(practiceMinutes)} ч`}
-          progress={progressPercent(practiceMinutes, TARGETS.weeklyPracticeMinutes)}
+          progress={progressPercent(practiceMinutes, TARGETS.weeklyPracticeMinutes * periodFactor)}
         />
         <MetricCard
           icon={<Activity className="h-5 w-5" />}
           label="Пет-проект"
           value={`${minutesToHours(petMinutes)} ч`}
-          progress={progressPercent(petMinutes, TARGETS.weeklyPetProjectMinutes)}
+          progress={progressPercent(petMinutes, TARGETS.weeklyPetProjectMinutes * periodFactor)}
         />
         <MetricCard
           icon={<Dumbbell className="h-5 w-5" />}
           label="Дефицит тела"
           value={bodyEnergyDays.length ? `${formatSignedKcal(totalDeficit)} ккал` : "-"}
-          progress={progressPercent(Math.max(0, totalDeficit), TARGETS.weeklyBodyDeficitKcal)}
+          progress={progressPercent(Math.max(0, totalDeficit), TARGETS.weeklyBodyDeficitKcal * periodFactor)}
         />
         <MetricCard
           icon={<Flame className="h-5 w-5" />}
           label="Текущая работа"
           value={`${minutesToHours(currentWorkMinutes)} ч`}
-          progress={progressPercent(currentWorkMinutes, 2400)}
+          progress={progressPercent(currentWorkMinutes, 2400 * periodFactor)}
         />
       </section>
 
@@ -155,7 +192,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
 
       <section className="panel overflow-hidden">
         <div className="border-b border-slate-200 p-5">
-          <h2 className="text-xl font-black">Дни недели</h2>
+          <h2 className="text-xl font-black">Дни периода</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
@@ -174,8 +211,8 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
-              {weekDays.map((day) => {
-                const dayEntries = weekEntries.filter((entry) => entry.date === day.date);
+              {periodDays.map((day) => {
+                const dayEntries = periodEntries.filter((entry) => entry.date === day.date);
                 const score = calculateDayScore(day, dayEntries);
                 const bodyEnergy = calculateBodyEnergy(day, bodyProfile);
                 return (
@@ -213,6 +250,19 @@ function average(values: Array<number | undefined>) {
   const filled = values.filter((value): value is number => typeof value === "number");
   if (!filled.length) return 0;
   return Math.round(filled.reduce((sum, value) => sum + value, 0) / filled.length);
+}
+
+function daysBetween(from: string, to: string) {
+  const end = new Date(`${to}T00:00:00`);
+  const current = new Date(`${from}T00:00:00`);
+  const result: string[] = [];
+
+  while (current <= end) {
+    result.push(localDateKey(current));
+    current.setDate(current.getDate() + 1);
+  }
+
+  return result;
 }
 
 function MetricCard({

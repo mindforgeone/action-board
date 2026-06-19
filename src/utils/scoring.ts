@@ -6,7 +6,18 @@ export function sumMinutes(
   entries: TimeEntry[],
   predicate: (entry: TimeEntry) => boolean,
 ): number {
-  return entries.filter(predicate).reduce((sum, entry) => sum + entry.durationMinutes, 0);
+  return sumSeconds(entries, predicate) / 60;
+}
+
+export function entryDurationSeconds(entry: TimeEntry): number {
+  return entry.durationSeconds ?? entry.durationMinutes * 60;
+}
+
+export function sumSeconds(
+  entries: TimeEntry[],
+  predicate: (entry: TimeEntry) => boolean,
+): number {
+  return entries.filter(predicate).reduce((sum, entry) => sum + entryDurationSeconds(entry), 0);
 }
 
 export function statusFromPoints(points: number): {

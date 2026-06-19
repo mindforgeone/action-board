@@ -16,7 +16,7 @@ import { GROUP_LABELS, QUICK_METRICS, TARGETS } from "../constants";
 import type { ActiveTimer, BodyProfile, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
 import { calculateBmr, calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import { formatDate, formatTimer, minutesToHours } from "../utils/date";
-import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
+import { calculateDayScore, progressPercent, sumMinutes, sumSeconds } from "../utils/scoring";
 import { WeightTrendPanel } from "./WeightTrendPanel";
 
 type TodayViewProps = {
@@ -30,6 +30,7 @@ type TodayViewProps = {
   activeTimers: Record<string, ActiveTimer>;
   now: Date;
   onToggleTimer: (category: TimerCategory) => Promise<void>;
+  onAddManualTimeEntry: (entry: Omit<TimeEntry, "id" | "userId" | "createdAt">) => Promise<void>;
   onSaveDay: (date: string, patch: Partial<DayRecord>) => Promise<void>;
   onUpsertCategory: (category: TimerCategory | Omit<TimerCategory, "id">) => Promise<void>;
   onDeleteCategory: (categoryId: string) => Promise<void>;
@@ -66,6 +67,7 @@ export function TodayView({
   activeTimers,
   now,
   onToggleTimer,
+  onAddManualTimeEntry,
   onSaveDay,
   onUpsertCategory,
   onDeleteCategory,
@@ -75,6 +77,8 @@ export function TodayView({
   const [savedFlash, setSavedFlash] = useState("");
   const [configureTimers, setConfigureTimers] = useState(false);
   const [configureMetrics, setConfigureMetrics] = useState(false);
+  const [manualCategoryId, setManualCategoryId] = useState("");
+  const [manualDraft, setManualDraft] = useState({ date: dateKey, hours: "", minutes: "" });
   const [newCategory, setNewCategory] = useState<Omit<TimerCategory, "id">>({
     name: "",
     group: "profession",
@@ -84,6 +88,10 @@ export function TodayView({
   useEffect(() => {
     setDraft(withAutoBmr(day ?? { date: dateKey }, bodyProfile));
   }, [bodyProfile, day, dateKey]);
+
+  useEffect(() => {
+    setManualDraft((current) => ({ ...current, date: current.date || dateKey }));
+  }, [dateKey]);
 
   const score = useMemo(() => calculateDayScore(draft, entries), [draft, entries]);
   const activeTimerList = Object.values(activeTimers);
@@ -165,6 +173,32 @@ export function TodayView({
       group: newCategory.group,
       description: "",
     });
+  }
+
+  async function addManualEntry(category: TimerCategory) {
+    const hours = Number(manualDraft.hours || 0);
+    const minutes = Number(manualDraft.minutes || 0);
+    const durationSeconds = Math.round(hours * 3600 + minutes * 60);
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) return;
+
+    const date = manualDraft.date || dateKey;
+    const isToday = date === dateKey;
+    const end = isToday ? new Date() : new Date(`${date}T21:00:00`);
+    const start = new Date(end.getTime() - durationSeconds * 1000);
+
+    await onAddManualTimeEntry({
+      date,
+      categoryId: category.id,
+      category: category.name,
+      group: category.group,
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      durationMinutes: Math.max(1, Math.round(durationSeconds / 60)),
+      durationSeconds,
+    });
+
+    setManualDraft({ date, hours: "", minutes: "" });
+    setManualCategoryId("");
   }
 
   async function deleteCategory(category: TimerCategory) {
@@ -350,10 +384,11 @@ export function TodayView({
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {groupCategories.map((category) => {
                     const activeTimer = activeTimers[category.id];
-                    const stoppedMinutes = sumMinutes(entries, (entry) => entry.categoryId === category.id);
-                    const liveMinutes = durationForActiveTimer(activeTimer, now) / 60000;
-                    const totalMinutes = stoppedMinutes + liveMinutes;
+                    const stoppedSeconds = sumSeconds(entries, (entry) => entry.categoryId === category.id);
+                    const liveSeconds = durationForActiveTimer(activeTimer, now) / 1000;
+                    const totalSeconds = stoppedSeconds + liveSeconds;
                     const active = Boolean(activeTimer);
+                    const manualOpen = manualCategoryId === category.id;
 
                     return (
                       <article
@@ -383,19 +418,77 @@ export function TodayView({
                               </button>
                             )}
                           </div>
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
                             <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-sm font-black text-slate-800">
-                              {minutesToHours(totalMinutes)} ч
+                              {formatTimer(totalSeconds * 1000)}
                             </span>
-                            <button
-                              className={`btn ${active ? "btn-danger" : "btn-primary"} min-w-28`}
-                              type="button"
-                              onClick={() => onToggleTimer(category)}
-                            >
-                              {active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                              {active ? "Стоп" : "Старт"}
-                            </button>
+                            <div className="flex gap-2">
+                              <button
+                                className="btn btn-secondary min-w-24"
+                                type="button"
+                                onClick={() => {
+                                  setManualCategoryId(manualOpen ? "" : category.id);
+                                  setManualDraft((current) => ({ ...current, date: current.date || dateKey }));
+                                }}
+                              >
+                                <Plus className="h-4 w-4" />
+                                Внести
+                              </button>
+                              <button
+                                className={`btn ${active ? "btn-danger" : "btn-primary"} min-w-28`}
+                                type="button"
+                                onClick={() => onToggleTimer(category)}
+                              >
+                                {active ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                {active ? "Стоп" : "Старт"}
+                              </button>
+                            </div>
                           </div>
+                          {manualOpen && (
+                            <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_0.65fr_0.65fr_auto]">
+                              <input
+                                className="field"
+                                type="date"
+                                value={manualDraft.date}
+                                onChange={(event) =>
+                                  setManualDraft((current) => ({ ...current, date: event.target.value }))
+                                }
+                              />
+                              <input
+                                className="field"
+                                inputMode="numeric"
+                                min="0"
+                                placeholder="часы"
+                                type="number"
+                                value={manualDraft.hours}
+                                onChange={(event) =>
+                                  setManualDraft((current) => ({ ...current, hours: event.target.value }))
+                                }
+                              />
+                              <input
+                                className="field"
+                                inputMode="numeric"
+                                min="0"
+                                max="59"
+                                placeholder="мин"
+                                type="number"
+                                value={manualDraft.minutes}
+                                onChange={(event) =>
+                                  setManualDraft((current) => ({ ...current, minutes: event.target.value }))
+                                }
+                              />
+                              <button
+                                className="btn btn-primary"
+                                type="button"
+                                onClick={() => {
+                                  void addManualEntry(category);
+                                }}
+                              >
+                                <Save className="h-4 w-4" />
+                                Ок
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </article>
                     );

@@ -49,6 +49,7 @@ export type TimeEntry = {
   startTime: string;
   endTime: string;
   durationMinutes: number;
+  durationSeconds?: number;
   createdAt: string;
 };
 
