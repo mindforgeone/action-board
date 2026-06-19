@@ -1,6 +1,6 @@
 import { DEFAULT_TIMER_CATEGORIES } from "../constants";
-import type { AppSettings, DayRecord, Goal, Period, TimeEntry, TimerCategory } from "../types";
-import { calculateBodyEnergy } from "./bodyEnergy";
+import type { AppSettings, BodyProfile, DayRecord, Goal, Period, TimeEntry, TimerCategory } from "../types";
+import { DEFAULT_BODY_PROFILE, calculateBodyEnergy } from "./bodyEnergy";
 import { isDateInPeriod } from "./date";
 import { calculateDayScore, sumMinutes } from "./scoring";
 
@@ -13,13 +13,14 @@ export type ExportPayload = {
   days: DayRecord[];
   timeEntries: TimeEntry[];
   goals: Goal[];
-  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds">;
+  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile">;
 };
 
 export function summarizePeriod(
   days: DayRecord[],
   entries: TimeEntry[],
   categories: TimerCategory[] = DEFAULT_TIMER_CATEGORIES,
+  bodyProfile: BodyProfile = DEFAULT_BODY_PROFILE,
 ) {
   const statusCounts = { red: 0, yellow: 0, green: 0, combat: 0 };
   let caloriesTotal = 0;
@@ -53,7 +54,7 @@ export function summarizePeriod(
       activeTotal += day.activeKcal;
       activeCount += 1;
     }
-    const bodyEnergy = calculateBodyEnergy(day);
+    const bodyEnergy = calculateBodyEnergy(day, bodyProfile);
     if (bodyEnergy.hasData) {
       deficitTotal += bodyEnergy.deficit;
       deficitCount += 1;
@@ -108,7 +109,7 @@ export function buildExportPayload(
   entries: TimeEntry[],
   goals: Goal[],
   period: Period,
-  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds">,
+  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile">,
 ): ExportPayload {
   const periodDays = Object.values(daysMap)
     .filter((day) => isDateInPeriod(day.date, period.from, period.to))
@@ -122,7 +123,7 @@ export function buildExportPayload(
     version: 1,
     generatedAt: new Date().toISOString(),
     period,
-    summary: summarizePeriod(periodDays, periodEntries, settings?.timerCategories),
+    summary: summarizePeriod(periodDays, periodEntries, settings?.timerCategories, settings?.bodyProfile),
     days: periodDays,
     timeEntries: periodEntries,
     goals,
@@ -168,7 +169,7 @@ export function toCsv(payload: ExportPayload): string {
   payload.days.forEach((day) => {
     const dayEntries = payload.timeEntries.filter((entry) => entry.date === day.date);
     const score = calculateDayScore(day, dayEntries);
-    const bodyEnergy = calculateBodyEnergy(day);
+    const bodyEnergy = calculateBodyEnergy(day, payload.settings?.bodyProfile);
     rows.push([
       "day",
       day.date,

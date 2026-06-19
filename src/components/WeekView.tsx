@@ -1,6 +1,6 @@
 import { Activity, BriefcaseBusiness, Dumbbell, Flame, TimerReset } from "lucide-react";
 import { TARGETS } from "../constants";
-import type { DayRecord, TimeEntry, TimerCategory } from "../types";
+import type { BodyProfile, DayRecord, TimeEntry, TimerCategory } from "../types";
 import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import { formatShortDate, formatWeekday, getWeekRange, minutesToHours } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
@@ -9,9 +9,10 @@ type WeekViewProps = {
   days: Record<string, DayRecord>;
   entries: TimeEntry[];
   categories: TimerCategory[];
+  bodyProfile: BodyProfile;
 };
 
-export function WeekView({ days, entries, categories }: WeekViewProps) {
+export function WeekView({ days, entries, categories, bodyProfile }: WeekViewProps) {
   const week = getWeekRange();
   const weekDays = week.days.map((date) => days[date] ?? { date });
   const weekEntries = entries.filter((entry) => entry.date >= week.from && entry.date <= week.to);
@@ -21,7 +22,7 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
   const petMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "pet-construction");
   const currentWorkMinutes = sumMinutes(weekEntries, (entry) => entry.categoryId === "current-job");
   const bodyMinutes = sumMinutes(weekEntries, (entry) => entry.group === "body");
-  const bodyEnergyDays = weekDays.map((day) => calculateBodyEnergy(day)).filter((day) => day.hasData);
+  const bodyEnergyDays = weekDays.map((day) => calculateBodyEnergy(day, bodyProfile)).filter((day) => day.hasData);
   const totalDeficit = bodyEnergyDays.reduce((sum, day) => sum + day.deficit, 0);
   const averageDeficit = bodyEnergyDays.length ? Math.round(totalDeficit / bodyEnergyDays.length) : 0;
 
@@ -176,7 +177,7 @@ export function WeekView({ days, entries, categories }: WeekViewProps) {
               {weekDays.map((day) => {
                 const dayEntries = weekEntries.filter((entry) => entry.date === day.date);
                 const score = calculateDayScore(day, dayEntries);
-                const bodyEnergy = calculateBodyEnergy(day);
+                const bodyEnergy = calculateBodyEnergy(day, bodyProfile);
                 return (
                   <tr key={day.date}>
                     <td className="px-4 py-3 font-semibold">

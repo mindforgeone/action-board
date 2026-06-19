@@ -54,6 +54,7 @@ function normalizeSettings(data: Partial<AppSettings> | undefined): AppSettings 
       Array.isArray(data?.visibleMetricIds) && data.visibleMetricIds.length > 0
         ? data.visibleMetricIds
         : DEFAULT_APP_SETTINGS.visibleMetricIds,
+    bodyProfile: data?.bodyProfile ?? DEFAULT_APP_SETTINGS.bodyProfile,
     createdAt: data?.createdAt,
     updatedAt: data?.updatedAt,
   };

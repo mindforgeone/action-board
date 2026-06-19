@@ -1,4 +1,5 @@
 import type { AppSettings, Goal, QuickMetricDefinition, TimerCategory } from "./types";
+import { DEFAULT_BODY_PROFILE } from "./utils/bodyEnergy";
 
 export const DEFAULT_TIMER_CATEGORIES: TimerCategory[] = [
   {
@@ -199,6 +200,7 @@ export const DEFAULT_VISIBLE_METRIC_IDS = QUICK_METRICS.map((metric) => metric.i
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   timerCategories: DEFAULT_TIMER_CATEGORIES,
   visibleMetricIds: DEFAULT_VISIBLE_METRIC_IDS,
+  bodyProfile: DEFAULT_BODY_PROFILE,
 };
 
 export const DEFAULT_GOALS: Omit<Goal, "userId" | "createdAt" | "updatedAt">[] = [

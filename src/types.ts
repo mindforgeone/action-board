@@ -3,6 +3,7 @@ export type GoalType = "profession" | "body" | "market" | "custom";
 export type GoalStatus = "active" | "done" | "paused";
 export type DayStatusKey = "red" | "yellow" | "green" | "combat";
 export type QuickMetricKind = "number" | "boolean" | "text";
+export type BiologicalSex = "male" | "female";
 
 export type TimerCategory = {
   id: string;
@@ -95,9 +96,16 @@ export type QuickMetricDefinition = {
   step?: string;
 };
 
+export type BodyProfile = {
+  heightCm: number;
+  birthDate: string;
+  sex: BiologicalSex;
+};
+
 export type AppSettings = {
   timerCategories: TimerCategory[];
   visibleMetricIds: string[];
+  bodyProfile: BodyProfile;
   createdAt?: string;
   updatedAt?: string;
 };

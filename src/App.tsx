@@ -153,9 +153,11 @@ export default function App() {
       {activeScreen === "today" && (
         <TodayView
           activeTimers={activeTimers}
+          bodyProfile={data.settings.bodyProfile}
           categories={data.settings.timerCategories}
           dateKey={todayKey}
           day={data.days[todayKey]}
+          days={data.days}
           entries={todayEntries}
           now={now}
           visibleMetricIds={data.settings.visibleMetricIds}
@@ -168,6 +170,7 @@ export default function App() {
       )}
       {activeScreen === "week" && (
         <WeekView
+          bodyProfile={data.settings.bodyProfile}
           categories={data.settings.timerCategories}
           days={data.days}
           entries={data.timeEntries}
@@ -183,6 +186,7 @@ export default function App() {
       )}
       {activeScreen === "history" && (
         <HistoryView
+          bodyProfile={data.settings.bodyProfile}
           categories={data.settings.timerCategories}
           days={data.days}
           entries={data.timeEntries}
@@ -196,6 +200,7 @@ export default function App() {
           settings={{
             timerCategories: data.settings.timerCategories,
             visibleMetricIds: data.settings.visibleMetricIds,
+            bodyProfile: data.settings.bodyProfile,
           }}
           onImportData={data.importData}
         />

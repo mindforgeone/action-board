@@ -13,17 +13,20 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { GROUP_LABELS, QUICK_METRICS, TARGETS } from "../constants";
-import type { ActiveTimer, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
-import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
+import type { ActiveTimer, BodyProfile, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
+import { calculateBmr, calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import { formatDate, formatTimer, minutesToHours } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
+import { WeightTrendPanel } from "./WeightTrendPanel";
 
 type TodayViewProps = {
   dateKey: string;
   day?: DayRecord;
+  days: Record<string, DayRecord>;
   entries: TimeEntry[];
   categories: TimerCategory[];
   visibleMetricIds: string[];
+  bodyProfile: BodyProfile;
   activeTimers: Record<string, ActiveTimer>;
   now: Date;
   onToggleTimer: (category: TimerCategory) => Promise<void>;
@@ -44,12 +47,22 @@ function numericValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
 }
 
+function withAutoBmr(day: DayRecord, profile: BodyProfile): DayRecord {
+  if (typeof day.weightKg !== "number" || day.weightKg <= 0 || day.basalMetabolismKcal) return day;
+  return {
+    ...day,
+    basalMetabolismKcal: calculateBmr(day.weightKg, profile),
+  };
+}
+
 export function TodayView({
   dateKey,
   day,
+  days,
   entries,
   categories,
   visibleMetricIds,
+  bodyProfile,
   activeTimers,
   now,
   onToggleTimer,
@@ -69,8 +82,8 @@ export function TodayView({
   });
 
   useEffect(() => {
-    setDraft(day ?? { date: dateKey });
-  }, [day, dateKey]);
+    setDraft(withAutoBmr(day ?? { date: dateKey }, bodyProfile));
+  }, [bodyProfile, day, dateKey]);
 
   const score = useMemo(() => calculateDayScore(draft, entries), [draft, entries]);
   const activeTimerList = Object.values(activeTimers);
@@ -88,7 +101,7 @@ export function TodayView({
     sumMinutes(entries, (entry) => entry.group === "body") + (activeMinutesByGroup.body ?? 0);
   const workMinutes =
     sumMinutes(entries, (entry) => entry.group === "work") + (activeMinutesByGroup.work ?? 0);
-  const bodyEnergy = calculateBodyEnergy(draft);
+  const bodyEnergy = calculateBodyEnergy(draft, bodyProfile);
 
   const groupedCategories = CATEGORY_GROUPS.map((group) => ({
     group,
@@ -102,9 +115,13 @@ export function TodayView({
   const textMetrics = visibleMetrics.filter((metric) => metric.kind === "text");
 
   function setNumberField(field: keyof DayRecord, value: string) {
+    const nextValue = value === "" ? undefined : Number(value);
     setDraft((current) => ({
       ...current,
-      [field]: value === "" ? undefined : Number(value),
+      [field]: nextValue,
+      ...(field === "weightKg" && typeof nextValue === "number"
+        ? { basalMetabolismKcal: calculateBmr(nextValue, bodyProfile) }
+        : {}),
     }));
   }
 
@@ -257,6 +274,8 @@ export function TodayView({
           </div>
         </div>
       </section>
+
+      <WeightTrendPanel days={days} draftDay={draft} profile={bodyProfile} />
 
       <section className="panel p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
