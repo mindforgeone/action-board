@@ -342,7 +342,8 @@ export const DEFAULT_GOALS: Omit<Goal, "userId" | "createdAt" | "updatedAt">[] =
 ];
 
 export const TARGETS = {
-  dailyProfessionMinutes: 240,
+  dailyProfessionMinimumMinutes: 30,
+  dailyProfessionMinutes: 120,
   dailyBodyDeficitKcal: 700,
   weeklyOneCMinutes: 600,
   weeklyPracticeMinutes: 300,

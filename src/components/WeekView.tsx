@@ -16,12 +16,12 @@ import type { BodyProfile, DayRecord, TimeEntry, TimerCategory } from "../types"
 import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
 import {
   formatDate,
+  formatDuration,
   formatShortDate,
   formatWeekday,
   getMonthRange,
   getWeekRange,
   localDateKey,
-  minutesToHours,
 } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes } from "../utils/scoring";
 
@@ -195,7 +195,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
             </button>
 
             <p className="rounded-md bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
-              {minutesToHours(sumMinutes(periodEntries, () => true))} ч всего
+              {formatDuration(sumMinutes(periodEntries, () => true))} всего
             </p>
           </div>
         </div>
@@ -205,25 +205,25 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
         <MetricCard
           icon={<GraduationCap className="h-5 w-5" />}
           label="Профессия всего"
-          value={`${minutesToHours(professionMinutes)} ч`}
+          value={formatDuration(professionMinutes)}
           progress={progressPercent(professionMinutes, TARGETS.dailyProfessionMinutes * period.days.length)}
         />
         <MetricCard
           icon={<BriefcaseBusiness className="h-5 w-5" />}
           label="1С Skillbox"
-          value={`${minutesToHours(oneCMinutes)} ч`}
+          value={formatDuration(oneCMinutes)}
           progress={progressPercent(oneCMinutes, TARGETS.weeklyOneCMinutes * periodFactor)}
         />
         <MetricCard
           icon={<TimerReset className="h-5 w-5" />}
           label="Практика"
-          value={`${minutesToHours(practiceMinutes)} ч`}
+          value={formatDuration(practiceMinutes)}
           progress={progressPercent(practiceMinutes, TARGETS.weeklyPracticeMinutes * periodFactor)}
         />
         <MetricCard
           icon={<Activity className="h-5 w-5" />}
           label="Пет-проект"
-          value={`${minutesToHours(petMinutes)} ч`}
+          value={formatDuration(petMinutes)}
           progress={progressPercent(petMinutes, TARGETS.weeklyPetProjectMinutes * periodFactor)}
         />
         <MetricCard
@@ -235,7 +235,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
         <MetricCard
           icon={<Flame className="h-5 w-5" />}
           label="Текущая работа"
-          value={`${minutesToHours(currentWorkMinutes)} ч`}
+          value={formatDuration(currentWorkMinutes)}
           progress={progressPercent(currentWorkMinutes, 2400 * periodFactor)}
         />
       </section>
@@ -253,7 +253,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 <div key={category.id}>
                   <div className="mb-2 flex items-center justify-between gap-3 text-sm">
                     <span className="font-semibold text-slate-800">{category.name}</span>
-                    <span className="font-mono font-black">{minutesToHours(category.minutes)} ч</span>
+                    <span className="font-mono font-black">{formatDuration(category.minutes)}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-100">
                     <div
@@ -286,7 +286,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
               <LineMetric label="Белок" value={proteinAverage ? `${proteinAverage} г` : "-"} />
               <LineMetric label="Активность" value={activeAverage ? `${activeAverage} ккал` : "-"} />
               <LineMetric label="Средний дефицит" value={bodyEnergyDays.length ? `${formatSignedKcal(averageDeficit)} ккал` : "-"} />
-              <LineMetric label="Часы тела" value={`${minutesToHours(bodyMinutes)} ч`} />
+              <LineMetric label="Часы тела" value={formatDuration(bodyMinutes)} />
               <LineMetric label="Тренировки" value={String(workouts)} />
               <LineMetric label="Дни без алкоголя" value={String(noAlcoholDays)} />
               <LineMetric label="Дни без зажора" value={String(noBingeDays)} />
@@ -335,10 +335,10 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                         {formatShortDate(slice.from)} - {formatShortDate(slice.to)}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{minutesToHours(slice.summary.totalMinutes)} ч</td>
-                    <td className="px-4 py-3">{minutesToHours(slice.summary.professionMinutes)} ч</td>
-                    <td className="px-4 py-3">{minutesToHours(slice.summary.bodyMinutes)} ч</td>
-                    <td className="px-4 py-3">{minutesToHours(slice.summary.currentWorkMinutes)} ч</td>
+                    <td className="px-4 py-3">{formatDuration(slice.summary.totalMinutes)}</td>
+                    <td className="px-4 py-3">{formatDuration(slice.summary.professionMinutes)}</td>
+                    <td className="px-4 py-3">{formatDuration(slice.summary.bodyMinutes)}</td>
+                    <td className="px-4 py-3">{formatDuration(slice.summary.currentWorkMinutes)}</td>
                     <td className="px-4 py-3 font-semibold">
                       {slice.summary.bodyEnergyDayCount ? `${formatSignedKcal(slice.summary.totalDeficit)} ккал` : "-"}
                     </td>
@@ -401,9 +401,9 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                       </span>
                     </td>
                     <td className="px-4 py-3 font-black">{tracked ? score.points : "-"}</td>
-                    <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.categoryId === "skillbox-1c"))}</td>
-                    <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.group === "profession"))}</td>
-                    <td className="px-4 py-3">{minutesToHours(sumMinutes(dayEntries, (entry) => entry.group === "body"))}</td>
+                    <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.categoryId === "skillbox-1c"))}</td>
+                    <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.group === "profession"))}</td>
+                    <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.group === "body"))}</td>
                     <td className="px-4 py-3">{day.calories ?? "-"}</td>
                     <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
                       {bodyEnergy.hasData ? formatSignedKcal(bodyEnergy.deficit) : "-"}
@@ -765,8 +765,8 @@ function DayDetailsModal({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <DetailStat label="Статус" value={hasTrackedData(row.day, row.entries) ? row.score.statusLabel : "Нет данных"} />
             <DetailStat label="Очки" value={hasTrackedData(row.day, row.entries) ? String(row.score.points) : "-"} />
-            <DetailStat label="Профессия" value={`${minutesToHours(professionMinutes)} ч`} />
-            <DetailStat label="Тело действия" value={`${minutesToHours(bodyMinutes)} ч`} />
+            <DetailStat label="Профессия" value={formatDuration(professionMinutes)} />
+            <DetailStat label="Тело действия" value={formatDuration(bodyMinutes)} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -785,7 +785,7 @@ function DayDetailsModal({
             <DetailStat label="Сон" value={row.day.sleepHours ? `${row.day.sleepHours} ч` : "-"} />
             <DetailStat label="Энергия" value={row.day.energy ? `${row.day.energy}/5` : "-"} />
             <DetailStat label="Тренировка" value={row.day.workout ? "Да" : "Нет"} />
-            <DetailStat label="Работа" value={`${minutesToHours(workMinutes)} ч`} />
+            <DetailStat label="Работа" value={formatDuration(workMinutes)} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -815,7 +815,7 @@ function DayDetailsModal({
                   >
                     <span className="font-semibold text-slate-700">{entry.category}</span>
                     <span className="font-mono font-black text-slate-950">
-                      {minutesToHours(entry.durationMinutes)} ч
+                      {formatDuration(entry.durationMinutes)}
                     </span>
                   </div>
                 ))

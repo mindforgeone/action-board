@@ -68,6 +68,22 @@ export function minutesToHours(minutes: number): string {
   return (minutes / 60).toFixed(minutes >= 60 ? 1 : 2);
 }
 
+export function formatDuration(minutes: number): string {
+  const totalMinutes = Math.max(0, Math.round(minutes));
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+
+  if (hours > 0 && remainingMinutes > 0) {
+    return `${hours} ч ${remainingMinutes} мин`;
+  }
+
+  if (hours > 0) {
+    return `${hours} ч`;
+  }
+
+  return `${remainingMinutes} мин`;
+}
+
 export function formatTimer(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);

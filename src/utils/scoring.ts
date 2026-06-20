@@ -1,4 +1,4 @@
-import { DEFAULT_TIMER_CATEGORIES } from "../constants";
+import { DEFAULT_TIMER_CATEGORIES, TARGETS } from "../constants";
 import type { DayRecord, DayScore, DayStatusKey, TimeEntry, TimerCategory } from "../types";
 import { BODY_DEFICIT_TARGET, calculateBodyEnergy } from "./bodyEnergy";
 
@@ -62,16 +62,23 @@ export function calculateDayScore(day: DayRecord | undefined, entries: TimeEntry
   let professionPoints = 0;
   let bodyPoints = 0;
 
-  const oneCMinutes = sumMinutes(entries, (entry) => entry.categoryId === "skillbox-1c");
-  if (oneCMinutes >= 240) {
+  const professionMinutes = sumMinutes(entries, (entry) => entry.group === "profession");
+  if (professionMinutes >= TARGETS.dailyProfessionMinutes) {
+    professionPoints += 8;
+    reasons.push("Профессия 2+ часа: +8");
+  } else if (professionMinutes >= TARGETS.dailyProfessionMinimumMinutes) {
     professionPoints += 4;
-    reasons.push("1С 4+ часа: +4");
-  } else if (oneCMinutes >= 120) {
+    reasons.push("Профессия 30+ минут: +4");
+  }
+
+  if (professionMinutes > TARGETS.dailyProfessionMinutes) {
     professionPoints += 2;
-    reasons.push("1С 2+ часа: +2");
-  } else if (oneCMinutes >= 30) {
-    professionPoints += 1;
-    reasons.push("1С 30+ минут: +1");
+    reasons.push("Профессия сверх 2 часов: +2");
+  }
+
+  if (professionMinutes >= 240) {
+    professionPoints += 2;
+    reasons.push("Глубокий блок профессии 4+ часа: +2");
   }
 
   const actionRules: Array<[string, number, string]> = [

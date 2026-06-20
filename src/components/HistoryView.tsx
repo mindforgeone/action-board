@@ -2,7 +2,7 @@ import { Filter, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { BodyProfile, DayRecord, DayStatusKey, TimeEntry, TimerCategory } from "../types";
 import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
-import { formatDate, minutesToHours } from "../utils/date";
+import { formatDate, formatDuration } from "../utils/date";
 import { calculateDayScore, sumMinutes } from "../utils/scoring";
 
 type HistoryViewProps = {
@@ -148,7 +148,7 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
                       </td>
                       <td className="px-4 py-3 font-black">{row.score.points}</td>
                       <td className="px-4 py-3">
-                        {minutesToHours(sumMinutes(row.entries, (entry) => entry.categoryId === "skillbox-1c"))} ч
+                        {formatDuration(sumMinutes(row.entries, (entry) => entry.categoryId === "skillbox-1c"))}
                       </td>
                       <td className="px-4 py-3">{row.day.calories ?? "-"}</td>
                       <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
@@ -257,8 +257,8 @@ function DayDetailsModal({
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <DetailStat label="Статус" value={row.score.statusLabel} />
             <DetailStat label="Очки" value={String(row.score.points)} />
-            <DetailStat label="Профессия" value={`${minutesToHours(professionMinutes)} ч`} />
-            <DetailStat label="Тело действия" value={`${minutesToHours(bodyMinutes)} ч`} />
+            <DetailStat label="Профессия" value={formatDuration(professionMinutes)} />
+            <DetailStat label="Тело действия" value={formatDuration(bodyMinutes)} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -277,7 +277,7 @@ function DayDetailsModal({
             <DetailStat label="Сон" value={row.day.sleepHours ? `${row.day.sleepHours} ч` : "-"} />
             <DetailStat label="Энергия" value={row.day.energy ? `${row.day.energy}/5` : "-"} />
             <DetailStat label="Тренировка" value={row.day.workout ? "Да" : "Нет"} />
-            <DetailStat label="Работа" value={`${minutesToHours(workMinutes)} ч`} />
+            <DetailStat label="Работа" value={formatDuration(workMinutes)} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -307,7 +307,7 @@ function DayDetailsModal({
                   >
                     <span className="font-semibold text-slate-700">{entry.category}</span>
                     <span className="font-mono font-black text-slate-950">
-                      {minutesToHours(entry.durationMinutes)} ч
+                      {formatDuration(entry.durationMinutes)}
                     </span>
                   </div>
                 ))

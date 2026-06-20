@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { GROUP_LABELS, QUICK_METRICS, TARGETS } from "../constants";
 import type { ActiveTimer, BodyProfile, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
 import { calculateBmr, calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
-import { formatDate, formatTimer, minutesToHours } from "../utils/date";
+import { formatDate, formatDuration, formatTimer } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes, sumSeconds } from "../utils/scoring";
 import { WeightTrendPanel } from "./WeightTrendPanel";
 
@@ -255,7 +255,7 @@ export function TodayView({
             <div className="kpi-card">
               <p className="text-sm font-semibold text-slate-500">Профессия</p>
               <p className="mt-2 text-3xl font-black text-sky-700">
-                {minutesToHours(professionMinutes)} ч
+                {formatDuration(professionMinutes)}
               </p>
               <ProgressBar value={progressPercent(professionMinutes, TARGETS.dailyProfessionMinutes)} />
             </div>
@@ -305,10 +305,10 @@ export function TodayView({
             )}
           </div>
           <div className="mt-4 rounded-md bg-slate-950 px-4 py-3 text-sm font-semibold text-white">
-            Текущая работа сегодня: {minutesToHours(workMinutes)} ч
+            Текущая работа сегодня: {formatDuration(workMinutes)}
           </div>
           <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
-            Действия по телу: {minutesToHours(bodyMinutes)} ч. Главный показатель тела теперь kcal-баланс.
+            Действия по телу: {formatDuration(bodyMinutes)}. Главный показатель тела теперь kcal-баланс.
           </div>
         </div>
       </section>
