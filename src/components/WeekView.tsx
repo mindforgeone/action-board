@@ -13,7 +13,7 @@ import {
 import { useMemo, useState, type ReactNode } from "react";
 import { TARGETS } from "../constants";
 import type { BodyProfile, DayRecord, TimeEntry, TimerCategory } from "../types";
-import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
+import { calculateBodyEnergy, formatEnergyBalance } from "../utils/bodyEnergy";
 import {
   formatDate,
   formatDuration,
@@ -228,8 +228,8 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
         />
         <MetricCard
           icon={<Dumbbell className="h-5 w-5" />}
-          label="Дефицит тела"
-          value={bodyEnergyDays.length ? `${formatSignedKcal(totalDeficit)} ккал` : "-"}
+          label="Баланс тела"
+          value={bodyEnergyDays.length ? formatEnergyBalance(totalDeficit) : "-"}
           progress={progressPercent(Math.max(0, totalDeficit), TARGETS.weeklyBodyDeficitKcal * periodFactor)}
         />
         <MetricCard
@@ -285,7 +285,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
               <LineMetric label="Калории" value={caloriesAverage ? `${caloriesAverage} ккал` : "-"} />
               <LineMetric label="Белок" value={proteinAverage ? `${proteinAverage} г` : "-"} />
               <LineMetric label="Активность" value={activeAverage ? `${activeAverage} ккал` : "-"} />
-              <LineMetric label="Средний дефицит" value={bodyEnergyDays.length ? `${formatSignedKcal(averageDeficit)} ккал` : "-"} />
+              <LineMetric label="Средний баланс" value={bodyEnergyDays.length ? formatEnergyBalance(averageDeficit) : "-"} />
               <LineMetric label="Часы тела" value={formatDuration(bodyMinutes)} />
               <LineMetric label="Тренировки" value={String(workouts)} />
               <LineMetric label="Дни без алкоголя" value={String(noAlcoholDays)} />
@@ -311,8 +311,8 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                   <th className="px-4 py-3">Профессия</th>
                   <th className="px-4 py-3">Тело</th>
                   <th className="px-4 py-3">Работа</th>
-                  <th className="px-4 py-3">Дефицит</th>
-                  <th className="px-4 py-3">Средний дефицит</th>
+                  <th className="px-4 py-3">Баланс</th>
+                  <th className="px-4 py-3">Средний баланс</th>
                   <th className="px-4 py-3">Активность</th>
                   <th className="px-4 py-3">Тренировки</th>
                   <th className="px-4 py-3">Дней с данными</th>
@@ -340,10 +340,10 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                     <td className="px-4 py-3">{formatDuration(slice.summary.bodyMinutes)}</td>
                     <td className="px-4 py-3">{formatDuration(slice.summary.currentWorkMinutes)}</td>
                     <td className="px-4 py-3 font-semibold">
-                      {slice.summary.bodyEnergyDayCount ? `${formatSignedKcal(slice.summary.totalDeficit)} ккал` : "-"}
+                      {slice.summary.bodyEnergyDayCount ? formatEnergyBalance(slice.summary.totalDeficit) : "-"}
                     </td>
                     <td className="px-4 py-3">
-                      {slice.summary.bodyEnergyDayCount ? `${formatSignedKcal(slice.summary.averageDeficit)} ккал` : "-"}
+                      {slice.summary.bodyEnergyDayCount ? formatEnergyBalance(slice.summary.averageDeficit) : "-"}
                     </td>
                     <td className="px-4 py-3">{slice.summary.activeAverage ? `${slice.summary.activeAverage} ккал` : "-"}</td>
                     <td className="px-4 py-3">{slice.summary.workouts}</td>
@@ -371,7 +371,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 <th className="px-4 py-3">Профессия</th>
                 <th className="px-4 py-3">Тело</th>
                 <th className="px-4 py-3">Ккал</th>
-                <th className="px-4 py-3">Дефицит</th>
+                <th className="px-4 py-3">Баланс</th>
                 <th className="px-4 py-3">Белок</th>
                 <th className="px-4 py-3">Активность</th>
               </tr>
@@ -384,12 +384,19 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 const tracked = hasTrackedData(day, dayEntries);
                 return (
                   <tr
-                    className="cursor-pointer transition hover:bg-slate-50"
+                    className={`cursor-pointer transition ${
+                      day.closedAt ? "bg-indigo-50/80 hover:bg-indigo-100" : "hover:bg-slate-50"
+                    }`}
                     key={day.date}
                     onClick={() => setSelectedDate(day.date)}
                   >
                     <td className="px-4 py-3 font-semibold">
                       {formatWeekday(day.date)} {formatShortDate(day.date)}
+                      {day.closedAt && (
+                        <span className="ml-2 inline-flex rounded-md border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-xs font-black text-indigo-800">
+                          Закрыт
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -406,7 +413,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                     <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.group === "body"))}</td>
                     <td className="px-4 py-3">{day.calories ?? "-"}</td>
                     <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
-                      {bodyEnergy.hasData ? formatSignedKcal(bodyEnergy.deficit) : "-"}
+                      {bodyEnergy.hasData ? formatEnergyBalance(bodyEnergy.deficit) : "-"}
                     </td>
                     <td className="px-4 py-3">{day.proteinGrams ?? "-"}</td>
                     <td className="px-4 py-3">{day.activeKcal ?? "-"}</td>
@@ -774,8 +781,8 @@ function DayDetailsModal({
             <DetailStat label="Съедено" value={row.day.calories ? `${row.day.calories} ккал` : "-"} />
             <DetailStat label="Расход" value={row.bodyEnergy.hasData ? `${row.bodyEnergy.burned} ккал` : "-"} />
             <DetailStat
-              label="Дефицит"
-              value={row.bodyEnergy.hasData ? `${formatSignedKcal(row.bodyEnergy.deficit)} ккал` : "-"}
+              label="Баланс"
+              value={row.bodyEnergy.hasData ? formatEnergyBalance(row.bodyEnergy.deficit) : "-"}
               valueClass={row.bodyEnergy.toneClass}
             />
             <DetailStat label="BMR" value={row.bodyEnergy.basal ? `${row.bodyEnergy.basal} ккал` : "-"} />

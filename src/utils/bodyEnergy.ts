@@ -146,3 +146,10 @@ export function formatSignedKcal(value: number): string {
   if (value > 0) return `+${Math.round(value)}`;
   return String(Math.round(value));
 }
+
+export function formatEnergyBalance(value: number): string {
+  const rounded = Math.round(value);
+  if (rounded > 0) return `Дефицит ${rounded} ккал`;
+  if (rounded < 0) return `Профицит ${Math.abs(rounded)} ккал`;
+  return "Баланс 0 ккал";
+}

@@ -1,7 +1,7 @@
 import { Filter, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { BodyProfile, DayRecord, DayStatusKey, TimeEntry, TimerCategory } from "../types";
-import { calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
+import { calculateBodyEnergy, formatEnergyBalance } from "../utils/bodyEnergy";
 import { formatDate, formatDuration } from "../utils/date";
 import { calculateDayScore, sumMinutes } from "../utils/scoring";
 
@@ -124,7 +124,7 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
                   <th className="px-4 py-3">Очки</th>
                   <th className="px-4 py-3">1С</th>
                   <th className="px-4 py-3">Калории</th>
-                  <th className="px-4 py-3">Дефицит</th>
+                  <th className="px-4 py-3">Баланс</th>
                   <th className="px-4 py-3">Активные ккал</th>
                   <th className="px-4 py-3">Вес</th>
                   <th className="px-4 py-3">Артефакт</th>
@@ -136,11 +136,20 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
                   const bodyEnergy = calculateBodyEnergy(row.day, bodyProfile);
                   return (
                     <tr
-                      className="cursor-pointer transition hover:bg-slate-50"
+                      className={`cursor-pointer transition ${
+                        row.day.closedAt ? "bg-indigo-50/80 hover:bg-indigo-100" : "hover:bg-slate-50"
+                      }`}
                       key={row.date}
                       onClick={() => setSelectedDate(row.date)}
                     >
-                      <td className="px-4 py-3 font-semibold">{formatDate(row.date)}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatDate(row.date)}
+                        {row.day.closedAt && (
+                          <span className="ml-2 inline-flex rounded-md border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-xs font-black text-indigo-800">
+                            Закрыт
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex min-w-28 rounded-md border px-2 py-1 text-xs font-black ${row.score.statusClass}`}>
                           {row.score.statusLabel}
@@ -152,7 +161,7 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
                       </td>
                       <td className="px-4 py-3">{row.day.calories ?? "-"}</td>
                       <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
-                        {bodyEnergy.hasData ? formatSignedKcal(bodyEnergy.deficit) : "-"}
+                        {bodyEnergy.hasData ? formatEnergyBalance(bodyEnergy.deficit) : "-"}
                       </td>
                       <td className="px-4 py-3">{row.day.activeKcal ?? "-"}</td>
                       <td className="px-4 py-3">{row.day.weightKg ?? "-"}</td>
@@ -266,8 +275,8 @@ function DayDetailsModal({
             <DetailStat label="Съедено" value={row.day.calories ? `${row.day.calories} ккал` : "-"} />
             <DetailStat label="Расход" value={bodyEnergy.hasData ? `${bodyEnergy.burned} ккал` : "-"} />
             <DetailStat
-              label="Дефицит"
-              value={bodyEnergy.hasData ? `${formatSignedKcal(bodyEnergy.deficit)} ккал` : "-"}
+              label="Баланс"
+              value={bodyEnergy.hasData ? formatEnergyBalance(bodyEnergy.deficit) : "-"}
               valueClass={bodyEnergy.toneClass}
             />
             <DetailStat label="BMR" value={bodyEnergy.basal ? `${bodyEnergy.basal} ккал` : "-"} />

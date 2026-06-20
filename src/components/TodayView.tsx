@@ -14,7 +14,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { GROUP_LABELS, QUICK_METRICS, TARGETS } from "../constants";
 import type { ActiveTimer, BodyProfile, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
-import { calculateBmr, calculateBodyEnergy, formatSignedKcal } from "../utils/bodyEnergy";
+import { calculateBmr, calculateBodyEnergy, formatEnergyBalance } from "../utils/bodyEnergy";
 import { formatDate, formatDuration, formatTimer } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes, sumSeconds } from "../utils/scoring";
 import { WeightTrendPanel } from "./WeightTrendPanel";
@@ -125,6 +125,7 @@ export function TodayView({
   const numberMetrics = visibleMetrics.filter((metric) => metric.kind === "number");
   const booleanMetrics = visibleMetrics.filter((metric) => metric.kind === "boolean");
   const textMetrics = visibleMetrics.filter((metric) => metric.kind === "text");
+  const dayClosed = Boolean(draft.closedAt);
 
   function setNumberField(field: keyof DayRecord, value: string) {
     const nextValue = value === "" ? undefined : Number(value);
@@ -241,8 +242,19 @@ export function TodayView({
                 Оффер и тело считаются только через действия.
               </p>
             </div>
-            <div className={`rounded-lg border px-4 py-3 text-left ${score.statusClass}`}>
-              <p className="text-sm font-semibold opacity-80">Статус дня</p>
+            <div
+              className={`rounded-lg border px-4 py-3 text-left ${
+                dayClosed ? "border-indigo-200 bg-indigo-50 text-indigo-950" : score.statusClass
+              }`}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-semibold opacity-80">Статус дня</p>
+                {dayClosed && (
+                  <span className="rounded-md border border-indigo-200 bg-indigo-100 px-2 py-0.5 text-xs font-black text-indigo-800">
+                    Закрыт
+                  </span>
+                )}
+              </div>
               <p className="mt-1 text-2xl font-black">{score.statusLabel}</p>
             </div>
           </div>
@@ -262,7 +274,7 @@ export function TodayView({
             <div className="kpi-card">
               <p className="text-sm font-semibold text-slate-500">Тело</p>
               <p className={`mt-2 text-3xl font-black ${bodyEnergy.toneClass}`}>
-                {bodyEnergy.hasData ? `${formatSignedKcal(bodyEnergy.deficit)} ккал` : "нет данных"}
+                {bodyEnergy.hasData ? formatEnergyBalance(bodyEnergy.deficit) : "нет данных"}
               </p>
               <p className="mt-1 text-xs font-semibold text-slate-500">
                 {bodyEnergy.label}
