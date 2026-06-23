@@ -369,7 +369,6 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 <th className="px-4 py-3">Очки</th>
                 <th className="px-4 py-3">1С</th>
                 <th className="px-4 py-3">Профессия</th>
-                <th className="px-4 py-3">Тело</th>
                 <th className="px-4 py-3">Ккал</th>
                 <th className="px-4 py-3">Баланс</th>
                 <th className="px-4 py-3">Белок</th>
@@ -410,7 +409,6 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                     <td className="px-4 py-3 font-black">{tracked ? score.points : "-"}</td>
                     <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.categoryId === "skillbox-1c"))}</td>
                     <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.group === "profession"))}</td>
-                    <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.group === "body"))}</td>
                     <td className="px-4 py-3">{day.calories ?? "-"}</td>
                     <td className={`px-4 py-3 font-semibold ${bodyEnergy.toneClass}`}>
                       {bodyEnergy.hasData ? formatEnergyBalance(bodyEnergy.deficit) : "-"}
