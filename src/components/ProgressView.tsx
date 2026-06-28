@@ -132,27 +132,36 @@ export function ProgressView({ days, entries, commitments, bodyProfile }: Progre
             <BarChart3 className="h-5 w-5 text-slate-700" />
             <h2 className="text-xl font-black">Профессия по дням</h2>
           </div>
-          <div className="mt-5 flex h-64 items-end gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 pb-3 pt-5">
-            {barRows.map((row) => {
-              const height = Math.max(4, progressPercent(row.professionMinutes, maxProfessionMinutes));
-              return (
-                <button
-                  className="flex min-w-7 flex-1 flex-col items-center justify-end gap-2"
-                  key={row.date}
-                  title={`${formatShortDate(row.date)} · ${formatDuration(row.professionMinutes)}`}
-                  type="button"
-                  onClick={() => setSelectedDate(row.date)}
-                >
-                  <span
-                    className={`w-full rounded-t-md transition ${
-                      selectedDate === row.date ? "bg-slate-950" : "bg-sky-600 hover:bg-sky-700"
-                    }`}
-                    style={{ height: `${height}%` }}
-                  />
-                  <span className="text-[10px] font-black text-slate-500">{formatShortDate(row.date)}</span>
-                </button>
-              );
-            })}
+          <div className="mt-5 h-64 rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="flex h-full items-end gap-2">
+              {barRows.map((row) => {
+                const height =
+                  row.professionMinutes > 0
+                    ? Math.max(6, progressPercent(row.professionMinutes, maxProfessionMinutes))
+                    : 0;
+                return (
+                  <button
+                    className="flex h-full min-w-7 flex-1 flex-col items-stretch justify-end gap-2"
+                    key={row.date}
+                    title={`${formatShortDate(row.date)} · ${formatDuration(row.professionMinutes)}`}
+                    type="button"
+                    onClick={() => setSelectedDate(row.date)}
+                  >
+                    <span className="relative min-h-0 flex-1 overflow-hidden rounded-md bg-white/70">
+                      <span
+                        className={`absolute bottom-0 left-0 right-0 rounded-t-md transition ${
+                          selectedDate === row.date ? "bg-slate-950" : "bg-sky-600 hover:bg-sky-700"
+                        }`}
+                        style={{ height: `${height}%` }}
+                      />
+                    </span>
+                    <span className="text-center text-[10px] font-black text-slate-500">
+                      {formatShortDate(row.date)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
