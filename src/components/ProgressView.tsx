@@ -21,9 +21,146 @@ type ProgressViewProps = {
   bodyProfile: BodyProfile;
 };
 
+type ProgressRow = {
+  date: string;
+  day: DayRecord;
+  entries: TimeEntry[];
+  score: ReturnType<typeof calculateDayScore>;
+  energy: ReturnType<typeof calculateBodyEnergy>;
+  tasks: NonNullable<DayRecord["tasks"]>;
+  tasksDone: number;
+  professionMinutes: number;
+  bodyMinutes: number;
+  workMinutes: number;
+  hasData: boolean;
+};
+
+type ChartMetricId =
+  | "professionMinutes"
+  | "bodyMinutes"
+  | "workMinutes"
+  | "deficit"
+  | "burned"
+  | "calories"
+  | "activeKcal"
+  | "weightKg"
+  | "proteinGrams"
+  | "sleepHours"
+  | "score"
+  | "tasksDone";
+
+type ChartMetric = {
+  id: ChartMetricId;
+  label: string;
+  scale: "zero" | "signed" | "range";
+  colorClass: string;
+  getValue: (row: ProgressRow) => number | null;
+  formatValue: (value: number) => string;
+};
+
+const CHART_METRICS: ChartMetric[] = [
+  {
+    id: "professionMinutes",
+    label: "Профессия",
+    scale: "zero",
+    colorClass: "bg-sky-600 hover:bg-sky-700",
+    getValue: (row) => row.professionMinutes,
+    formatValue: formatDuration,
+  },
+  {
+    id: "bodyMinutes",
+    label: "Действия по телу",
+    scale: "zero",
+    colorClass: "bg-emerald-600 hover:bg-emerald-700",
+    getValue: (row) => row.bodyMinutes,
+    formatValue: formatDuration,
+  },
+  {
+    id: "workMinutes",
+    label: "Работа",
+    scale: "zero",
+    colorClass: "bg-slate-600 hover:bg-slate-700",
+    getValue: (row) => row.workMinutes,
+    formatValue: formatDuration,
+  },
+  {
+    id: "deficit",
+    label: "Дефицит / профицит",
+    scale: "signed",
+    colorClass: "bg-emerald-600 hover:bg-emerald-700",
+    getValue: (row) => (row.energy.hasData ? row.energy.deficit : null),
+    formatValue: formatEnergyBalance,
+  },
+  {
+    id: "burned",
+    label: "Расход калорий",
+    scale: "zero",
+    colorClass: "bg-orange-500 hover:bg-orange-600",
+    getValue: (row) => (row.energy.basal > 0 ? row.energy.burned : null),
+    formatValue: formatKcal,
+  },
+  {
+    id: "calories",
+    label: "Съедено калорий",
+    scale: "zero",
+    colorClass: "bg-amber-500 hover:bg-amber-600",
+    getValue: (row) => row.day.calories ?? null,
+    formatValue: formatKcal,
+  },
+  {
+    id: "activeKcal",
+    label: "Активные ккал",
+    scale: "zero",
+    colorClass: "bg-red-500 hover:bg-red-600",
+    getValue: (row) => row.day.activeKcal ?? null,
+    formatValue: formatKcal,
+  },
+  {
+    id: "weightKg",
+    label: "Вес",
+    scale: "range",
+    colorClass: "bg-indigo-600 hover:bg-indigo-700",
+    getValue: (row) => row.day.weightKg ?? null,
+    formatValue: (value) => `${formatDecimal(value, 1)} кг`,
+  },
+  {
+    id: "proteinGrams",
+    label: "Белок",
+    scale: "zero",
+    colorClass: "bg-violet-600 hover:bg-violet-700",
+    getValue: (row) => row.day.proteinGrams ?? null,
+    formatValue: (value) => `${Math.round(value)} г`,
+  },
+  {
+    id: "sleepHours",
+    label: "Сон",
+    scale: "zero",
+    colorClass: "bg-cyan-600 hover:bg-cyan-700",
+    getValue: (row) => row.day.sleepHours ?? null,
+    formatValue: (value) => `${formatDecimal(value, 1)} ч`,
+  },
+  {
+    id: "score",
+    label: "Очки дня",
+    scale: "zero",
+    colorClass: "bg-slate-950 hover:bg-slate-800",
+    getValue: (row) => (row.hasData ? row.score.points : null),
+    formatValue: (value) => `${Math.round(value)} очк.`,
+  },
+  {
+    id: "tasksDone",
+    label: "Выполненные задачи",
+    scale: "zero",
+    colorClass: "bg-teal-600 hover:bg-teal-700",
+    getValue: (row) => (row.tasks.length ? row.tasksDone : null),
+    formatValue: (value) => `${Math.round(value)} задач`,
+  },
+];
+
 export function ProgressView({ days, entries, commitments, bodyProfile }: ProgressViewProps) {
   const todayKey = localDateKey();
   const [selectedDate, setSelectedDate] = useState(todayKey);
+  const [chartMetricId, setChartMetricId] = useState<ChartMetricId>("professionMinutes");
   const dates = useMemo(() => buildLastDates(todayKey, 42), [todayKey]);
 
   const rows = useMemo(
@@ -43,6 +180,8 @@ export function ProgressView({ days, entries, commitments, bodyProfile }: Progre
           tasks,
           tasksDone: tasks.filter((task) => task.done).length,
           professionMinutes: sumMinutes(dayEntries, (entry) => entry.group === "profession"),
+          bodyMinutes: sumMinutes(dayEntries, (entry) => entry.group === "body"),
+          workMinutes: sumMinutes(dayEntries, (entry) => entry.group === "work"),
           hasData: hasTrackedData(day, dayEntries),
         };
       }),
@@ -51,7 +190,13 @@ export function ProgressView({ days, entries, commitments, bodyProfile }: Progre
 
   const selectedRow = rows.find((row) => row.date === selectedDate) ?? rows[rows.length - 1];
   const barRows = rows.slice(-14);
-  const maxProfessionMinutes = Math.max(120, ...barRows.map((row) => row.professionMinutes));
+  const chartMetric = CHART_METRICS.find((metric) => metric.id === chartMetricId) ?? CHART_METRICS[0];
+  const chartPoints = barRows.map((row) => ({
+    row,
+    value: chartMetric.getValue(row),
+  }));
+  const chartStats = buildChartStats(chartPoints, chartMetric);
+  const selectedChartValue = chartMetric.getValue(selectedRow);
   const trackedRows = rows.filter((row) => row.hasData);
   const closedDays = rows.filter((row) => row.day.closedAt).length;
   const strongDays = rows.filter(
@@ -128,40 +273,71 @@ export function ProgressView({ days, entries, commitments, bodyProfile }: Progre
         </div>
 
         <div className="panel p-5">
-          <div className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-slate-700" />
-            <h2 className="text-xl font-black">Профессия по дням</h2>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-slate-700" />
+              <h2 className="text-xl font-black">{chartMetric.label} по дням</h2>
+            </div>
+            <select
+              className="field min-h-10 sm:w-56"
+              value={chartMetricId}
+              onChange={(event) => setChartMetricId(event.target.value as ChartMetricId)}
+            >
+              {CHART_METRICS.map((metric) => (
+                <option key={metric.id} value={metric.id}>
+                  {metric.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="mt-5 h-64 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <div className="flex h-full items-end gap-2">
-              {barRows.map((row) => {
-                const height =
-                  row.professionMinutes > 0
-                    ? Math.max(6, progressPercent(row.professionMinutes, maxProfessionMinutes))
-                    : 0;
+              {chartPoints.map((point) => {
                 return (
                   <button
                     className="flex h-full min-w-7 flex-1 flex-col items-stretch justify-end gap-2"
-                    key={row.date}
-                    title={`${formatShortDate(row.date)} · ${formatDuration(row.professionMinutes)}`}
+                    key={point.row.date}
+                    title={`${formatShortDate(point.row.date)} · ${
+                      point.value === null ? "нет данных" : chartMetric.formatValue(point.value)
+                    }`}
                     type="button"
-                    onClick={() => setSelectedDate(row.date)}
+                    onClick={() => setSelectedDate(point.row.date)}
                   >
                     <span className="relative min-h-0 flex-1 overflow-hidden rounded-md bg-white/70">
-                      <span
-                        className={`absolute bottom-0 left-0 right-0 rounded-t-md transition ${
-                          selectedDate === row.date ? "bg-slate-950" : "bg-sky-600 hover:bg-sky-700"
-                        }`}
-                        style={{ height: `${height}%` }}
+                      {chartMetric.scale === "signed" && (
+                        <span className="absolute left-0 right-0 top-1/2 h-px bg-slate-300" />
+                      )}
+                      <ChartBar
+                        metric={chartMetric}
+                        point={point}
+                        selected={selectedDate === point.row.date}
+                        stats={chartStats}
                       />
                     </span>
                     <span className="text-center text-[10px] font-black text-slate-500">
-                      {formatShortDate(row.date)}
+                      {formatShortDate(point.row.date)}
                     </span>
                   </button>
                 );
               })}
             </div>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <ChartStat
+              label="Среднее"
+              value={chartStats ? chartMetric.formatValue(chartStats.average) : "-"}
+              hint={chartStats ? `${chartStats.count} дн. с данными` : "нет данных"}
+            />
+            <ChartStat
+              label="Минимум"
+              value={chartStats ? chartMetric.formatValue(chartStats.min.value) : "-"}
+              hint={chartStats ? formatShortDate(chartStats.min.date) : "нет данных"}
+            />
+            <ChartStat
+              label="Максимум"
+              value={chartStats ? chartMetric.formatValue(chartStats.max.value) : "-"}
+              hint={chartStats ? formatShortDate(chartStats.max.date) : "нет данных"}
+            />
           </div>
         </div>
       </section>
@@ -175,6 +351,10 @@ export function ProgressView({ days, entries, commitments, bodyProfile }: Progre
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Detail label="Статус" value={selectedRow.hasData ? selectedRow.score.statusLabel : "Нет данных"} />
             <Detail label="Очки" value={selectedRow.hasData ? String(selectedRow.score.points) : "-"} />
+            <Detail
+              label="На графике"
+              value={selectedChartValue === null ? "-" : chartMetric.formatValue(selectedChartValue)}
+            />
             <Detail label="Профессия" value={formatDuration(selectedRow.professionMinutes)} />
             <Detail
               label="Баланс"
@@ -255,6 +435,74 @@ export function ProgressView({ days, entries, commitments, bodyProfile }: Progre
   );
 }
 
+function ChartBar({
+  metric,
+  point,
+  selected,
+  stats,
+}: {
+  metric: ChartMetric;
+  point: { row: ProgressRow; value: number | null };
+  selected: boolean;
+  stats: ReturnType<typeof buildChartStats>;
+}) {
+  if (point.value === null || !stats) return null;
+
+  if (metric.scale === "signed") {
+    const height =
+      point.value === 0 ? 2 : Math.max(5, Math.round((Math.abs(point.value) / stats.maxAbs) * 46));
+    const isNegative = point.value < 0;
+    const className = selected ? "bg-slate-950" : isNegative ? "bg-rose-600" : "bg-emerald-600";
+
+    return (
+      <span
+        className={`absolute left-0 right-0 ${isNegative ? "rounded-b-md" : "rounded-t-md"} ${className}`}
+        style={{
+          [isNegative ? "top" : "bottom"]: "50%",
+          height: `${height}%`,
+        }}
+      />
+    );
+  }
+
+  if (metric.scale === "range") {
+    const height =
+      stats.range === 0
+        ? 50
+        : Math.max(10, Math.round(((point.value - stats.minValue) / stats.range) * 82) + 8);
+
+    return (
+      <span
+        className={`absolute bottom-0 left-0 right-0 rounded-t-md transition ${
+          selected ? "bg-slate-950" : metric.colorClass
+        }`}
+        style={{ height: `${height}%` }}
+      />
+    );
+  }
+
+  const height = point.value > 0 ? Math.max(6, progressPercent(point.value, stats.maxValue)) : 0;
+
+  return (
+    <span
+      className={`absolute bottom-0 left-0 right-0 rounded-t-md transition ${
+        selected ? "bg-slate-950" : metric.colorClass
+      }`}
+      style={{ height: `${height}%` }}
+    />
+  );
+}
+
+function ChartStat({ label, value, hint }: { label: string; value: string; hint: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <p className="text-xs font-semibold text-slate-500">{label}</p>
+      <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">{hint}</p>
+    </div>
+  );
+}
+
 function MiniStat({
   icon,
   label,
@@ -299,6 +547,36 @@ function LegendDot({ className, label }: { className: string; label: string }) {
       {label}
     </span>
   );
+}
+
+function buildChartStats(points: Array<{ row: ProgressRow; value: number | null }>, metric: ChartMetric) {
+  const filled = points
+    .filter((point): point is { row: ProgressRow; value: number } => point.value !== null)
+    .map((point) => ({
+      date: point.row.date,
+      value: point.value,
+    }));
+
+  if (!filled.length) return null;
+
+  const min = filled.reduce((best, point) => (point.value < best.value ? point : best), filled[0]);
+  const max = filled.reduce((best, point) => (point.value > best.value ? point : best), filled[0]);
+  const total = filled.reduce((sum, point) => sum + point.value, 0);
+  const maxAbs = Math.max(1, ...filled.map((point) => Math.abs(point.value)));
+  const maxValue = Math.max(1, max.value);
+  const minValue = min.value;
+  const range = metric.scale === "range" ? max.value - min.value : Math.max(1, max.value - min.value);
+
+  return {
+    average: total / filled.length,
+    count: filled.length,
+    max,
+    maxAbs,
+    maxValue,
+    min,
+    minValue,
+    range,
+  };
 }
 
 function buildCommitmentProgress(commitment: WordCommitment, todayKey: string) {
@@ -383,4 +661,15 @@ function buildLastDates(anchorKey: string, count: number) {
 
 function dateFromKey(dateKey: string) {
   return new Date(`${dateKey}T00:00:00`);
+}
+
+function formatKcal(value: number) {
+  return `${Math.round(value)} ккал`;
+}
+
+function formatDecimal(value: number, maximumFractionDigits: number) {
+  return new Intl.NumberFormat("ru-RU", {
+    maximumFractionDigits,
+    minimumFractionDigits: 0,
+  }).format(value);
 }
