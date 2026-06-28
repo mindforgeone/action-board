@@ -1,4 +1,4 @@
-import type { AppSettings, Goal, QuickMetricDefinition, TimerCategory } from "./types";
+import type { AppSettings, Goal, QuickMetricDefinition, TimerCategory, WordCommitment } from "./types";
 import { DEFAULT_BODY_PROFILE } from "./utils/bodyEnergy";
 
 export const DEFAULT_TIMER_CATEGORIES: TimerCategory[] = [
@@ -197,10 +197,30 @@ export const QUICK_METRICS: QuickMetricDefinition[] = [
 
 export const DEFAULT_VISIBLE_METRIC_IDS = QUICK_METRICS.map((metric) => metric.id);
 
+export const DEFAULT_WORD_COMMITMENTS: WordCommitment[] = [
+  {
+    id: "commitment-no-instagram",
+    title: "Без Instagram",
+    targetDays: 30,
+    startDate: "2026-06-20",
+    status: "active",
+    checks: {},
+  },
+  {
+    id: "commitment-no-alcohol",
+    title: "Без алкоголя",
+    targetDays: 20,
+    startDate: "2026-06-20",
+    status: "active",
+    checks: {},
+  },
+];
+
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   timerCategories: DEFAULT_TIMER_CATEGORIES,
   visibleMetricIds: DEFAULT_VISIBLE_METRIC_IDS,
   bodyProfile: DEFAULT_BODY_PROFILE,
+  wordCommitments: DEFAULT_WORD_COMMITMENTS,
 };
 
 export const DEFAULT_GOALS: Omit<Goal, "userId" | "createdAt" | "updatedAt">[] = [

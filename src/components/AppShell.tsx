@@ -1,5 +1,6 @@
 import type { User } from "firebase/auth";
 import {
+  Activity,
   CalendarDays,
   FileDown,
   History,
@@ -9,7 +10,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type AppScreen = "today" | "week" | "goals" | "history" | "export";
+export type AppScreen = "today" | "week" | "progress" | "goals" | "history" | "export";
 
 type AppShellProps = {
   user: User;
@@ -22,6 +23,7 @@ type AppShellProps = {
 const NAV_ITEMS = [
   { id: "today", label: "Сегодня", icon: CalendarDays },
   { id: "week", label: "Неделя", icon: Trophy },
+  { id: "progress", label: "Прогресс", icon: Activity },
   { id: "goals", label: "Цели", icon: Target },
   { id: "history", label: "История", icon: History },
   { id: "export", label: "Экспорт", icon: FileDown },

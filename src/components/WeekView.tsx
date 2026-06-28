@@ -59,6 +59,8 @@ type PeriodSummary = {
   bodyEnergyDayCount: number;
   activeAverage: number;
   workouts: number;
+  tasksTotal: number;
+  tasksDone: number;
   trackedDays: number;
 };
 
@@ -110,6 +112,11 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
   const workouts = periodDays.filter((day) => day.workout).length;
   const noAlcoholDays = periodDays.filter((day) => day.alcohol === false).length;
   const noBingeDays = periodDays.filter((day) => day.binge === false).length;
+  const tasksTotal = periodDays.reduce((sum, day) => sum + (day.tasks?.length ?? 0), 0);
+  const tasksDone = periodDays.reduce(
+    (sum, day) => sum + (day.tasks?.filter((task) => task.done).length ?? 0),
+    0,
+  );
   const trackedDays = periodDays.filter((day) =>
     hasTrackedData(day, periodEntries.filter((entry) => entry.date === day.date)),
   ).length;
@@ -288,6 +295,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
               <LineMetric label="Средний баланс" value={bodyEnergyDays.length ? formatEnergyBalance(averageDeficit) : "-"} />
               <LineMetric label="Часы тела" value={formatDuration(bodyMinutes)} />
               <LineMetric label="Тренировки" value={String(workouts)} />
+              <LineMetric label="Задачи" value={tasksTotal ? `${tasksDone}/${tasksTotal}` : "-"} />
               <LineMetric label="Дни без алкоголя" value={String(noAlcoholDays)} />
               <LineMetric label="Дни без зажора" value={String(noBingeDays)} />
             </div>
@@ -315,6 +323,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                   <th className="px-4 py-3">Средний баланс</th>
                   <th className="px-4 py-3">Активность</th>
                   <th className="px-4 py-3">Тренировки</th>
+                  <th className="px-4 py-3">Задачи</th>
                   <th className="px-4 py-3">Дней с данными</th>
                 </tr>
               </thead>
@@ -347,6 +356,9 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                     </td>
                     <td className="px-4 py-3">{slice.summary.activeAverage ? `${slice.summary.activeAverage} ккал` : "-"}</td>
                     <td className="px-4 py-3">{slice.summary.workouts}</td>
+                    <td className="px-4 py-3">
+                      {slice.summary.tasksTotal ? `${slice.summary.tasksDone}/${slice.summary.tasksTotal}` : "-"}
+                    </td>
                     <td className="px-4 py-3">{slice.summary.trackedDays}</td>
                   </tr>
                 ))}
@@ -367,6 +379,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 <th className="px-4 py-3">День</th>
                 <th className="px-4 py-3">Статус</th>
                 <th className="px-4 py-3">Очки</th>
+                <th className="px-4 py-3">Задачи</th>
                 <th className="px-4 py-3">1С</th>
                 <th className="px-4 py-3">Профессия</th>
                 <th className="px-4 py-3">Ккал</th>
@@ -381,6 +394,8 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                 const score = calculateDayScore(day, dayEntries);
                 const bodyEnergy = calculateBodyEnergy(day, bodyProfile);
                 const tracked = hasTrackedData(day, dayEntries);
+                const tasks = day.tasks ?? [];
+                const doneTasks = tasks.filter((task) => task.done).length;
                 return (
                   <tr
                     className={`cursor-pointer transition ${
@@ -407,6 +422,7 @@ export function WeekView({ days, entries, categories, bodyProfile }: WeekViewPro
                       </span>
                     </td>
                     <td className="px-4 py-3 font-black">{tracked ? score.points : "-"}</td>
+                    <td className="px-4 py-3">{tasks.length ? `${doneTasks}/${tasks.length}` : "-"}</td>
                     <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.categoryId === "skillbox-1c"))}</td>
                     <td className="px-4 py-3">{formatDuration(sumMinutes(dayEntries, (entry) => entry.group === "profession"))}</td>
                     <td className="px-4 py-3">{day.calories ?? "-"}</td>
@@ -519,6 +535,11 @@ function summarizePeriod(
   const dayRecords = periodDays.map((date) => days[date] ?? { date });
   const bodyEnergyDays = dayRecords.map((day) => calculateBodyEnergy(day, bodyProfile)).filter((day) => day.hasData);
   const totalDeficit = bodyEnergyDays.reduce((sum, day) => sum + day.deficit, 0);
+  const tasksTotal = dayRecords.reduce((sum, day) => sum + (day.tasks?.length ?? 0), 0);
+  const tasksDone = dayRecords.reduce(
+    (sum, day) => sum + (day.tasks?.filter((task) => task.done).length ?? 0),
+    0,
+  );
 
   return {
     totalMinutes: sumMinutes(periodEntries, () => true),
@@ -530,6 +551,8 @@ function summarizePeriod(
     bodyEnergyDayCount: bodyEnergyDays.length,
     activeAverage: average(dayRecords.map((day) => day.activeKcal)),
     workouts: dayRecords.filter((day) => day.workout).length,
+    tasksTotal,
+    tasksDone,
     trackedDays: dayRecords.filter((day) =>
       hasTrackedData(day, periodEntries.filter((entry) => entry.date === day.date)),
     ).length,
@@ -681,7 +704,8 @@ function hasTrackedData(day: DayRecord, dayEntries: TimeEntry[]) {
     Boolean(day.closedAt) ||
     Boolean(day.artifact) ||
     Boolean(day.reflection) ||
-    Boolean(day.note)
+    Boolean(day.note) ||
+    Boolean(day.tasks?.length)
   );
 }
 
@@ -746,6 +770,8 @@ function DayDetailsModal({
   const professionMinutes = sumMinutes(row.entries, (entry) => entry.group === "profession");
   const bodyMinutes = sumMinutes(row.entries, (entry) => entry.group === "body");
   const workMinutes = sumMinutes(row.entries, (entry) => entry.group === "work");
+  const tasks = row.day.tasks ?? [];
+  const doneTasks = tasks.filter((task) => task.done).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-3 sm:items-center">
@@ -772,6 +798,7 @@ function DayDetailsModal({
             <DetailStat label="Очки" value={hasTrackedData(row.day, row.entries) ? String(row.score.points) : "-"} />
             <DetailStat label="Профессия" value={formatDuration(professionMinutes)} />
             <DetailStat label="Тело действия" value={formatDuration(bodyMinutes)} />
+            <DetailStat label="Задачи" value={tasks.length ? `${doneTasks}/${tasks.length}` : "-"} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -806,6 +833,27 @@ function DayDetailsModal({
                   <li>Очков не было.</li>
                 )}
               </ul>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4">
+            <p className="text-sm font-black text-slate-700">Задачи дня</p>
+            <div className="mt-3 space-y-2">
+              {tasks.length ? (
+                tasks.map((task) => (
+                  <div
+                    className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                      task.done ? "bg-emerald-50 text-emerald-900" : "bg-slate-50 text-slate-600"
+                    }`}
+                    key={task.id}
+                  >
+                    {task.done ? "✓ " : "○ "}
+                    {task.title}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Задач не было.</p>
+              )}
             </div>
           </div>
 

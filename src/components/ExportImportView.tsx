@@ -8,7 +8,7 @@ type ExportImportViewProps = {
   days: Record<string, DayRecord>;
   entries: TimeEntry[];
   goals: Goal[];
-  settings: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile">;
+  settings: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile" | "wordCommitments">;
   onImportData: (payload: unknown) => Promise<void>;
 };
 

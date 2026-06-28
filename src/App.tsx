@@ -5,6 +5,7 @@ import { ExportImportView } from "./components/ExportImportView";
 import { GoalsView } from "./components/GoalsView";
 import { HistoryView } from "./components/HistoryView";
 import { LoginScreen } from "./components/LoginScreen";
+import { ProgressView } from "./components/ProgressView";
 import { TodayView } from "./components/TodayView";
 import { WeekView } from "./components/WeekView";
 import { useActionBoardData } from "./hooks/useActionBoardData";
@@ -163,11 +164,13 @@ export default function App() {
           entries={todayEntries}
           now={now}
           visibleMetricIds={data.settings.visibleMetricIds}
+          wordCommitments={data.settings.wordCommitments}
           onAddManualTimeEntry={data.addTimeEntry}
           onDeleteCategory={deleteTimerCategory}
           onSaveDay={data.saveDay}
           onToggleTimer={toggleTimer}
           onUpdateVisibleMetricIds={data.updateVisibleMetricIds}
+          onUpdateWordCommitments={data.updateWordCommitments}
           onUpsertCategory={data.upsertTimerCategory}
         />
       )}
@@ -175,6 +178,14 @@ export default function App() {
         <WeekView
           bodyProfile={data.settings.bodyProfile}
           categories={data.settings.timerCategories}
+          days={data.days}
+          entries={data.timeEntries}
+        />
+      )}
+      {activeScreen === "progress" && (
+        <ProgressView
+          bodyProfile={data.settings.bodyProfile}
+          commitments={data.settings.wordCommitments}
           days={data.days}
           entries={data.timeEntries}
         />
@@ -204,6 +215,7 @@ export default function App() {
             timerCategories: data.settings.timerCategories,
             visibleMetricIds: data.settings.visibleMetricIds,
             bodyProfile: data.settings.bodyProfile,
+            wordCommitments: data.settings.wordCommitments,
           }}
           onImportData={data.importData}
         />

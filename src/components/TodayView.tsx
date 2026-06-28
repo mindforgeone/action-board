@@ -2,18 +2,31 @@ import {
   CheckCircle2,
   Clock3,
   Dumbbell,
+  Flag,
+  ListTodo,
   Pause,
   Play,
   Plus,
   Save,
   Settings2,
+  ShieldCheck,
   SlidersHorizontal,
   Trash2,
   XCircle,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { GROUP_LABELS, QUICK_METRICS, TARGETS } from "../constants";
-import type { ActiveTimer, BodyProfile, CategoryGroup, DayRecord, TimeEntry, TimerCategory } from "../types";
+import type {
+  ActiveTimer,
+  BodyProfile,
+  CategoryGroup,
+  CommitmentCheckStatus,
+  DayRecord,
+  DayTask,
+  TimeEntry,
+  TimerCategory,
+  WordCommitment,
+} from "../types";
 import { calculateBmr, calculateBodyEnergy, formatEnergyBalance } from "../utils/bodyEnergy";
 import { formatDate, formatDuration, formatTimer } from "../utils/date";
 import { calculateDayScore, progressPercent, sumMinutes, sumSeconds } from "../utils/scoring";
@@ -25,6 +38,7 @@ type TodayViewProps = {
   days: Record<string, DayRecord>;
   entries: TimeEntry[];
   categories: TimerCategory[];
+  wordCommitments: WordCommitment[];
   visibleMetricIds: string[];
   bodyProfile: BodyProfile;
   activeTimers: Record<string, ActiveTimer>;
@@ -35,6 +49,7 @@ type TodayViewProps = {
   onUpsertCategory: (category: TimerCategory | Omit<TimerCategory, "id">) => Promise<void>;
   onDeleteCategory: (categoryId: string) => Promise<void>;
   onUpdateVisibleMetricIds: (metricIds: string[]) => Promise<void>;
+  onUpdateWordCommitments: (commitments: WordCommitment[]) => Promise<void>;
 };
 
 const CATEGORY_GROUPS: CategoryGroup[] = ["profession", "body", "work", "other"];
@@ -66,6 +81,7 @@ export function TodayView({
   days,
   entries,
   categories,
+  wordCommitments,
   visibleMetricIds,
   bodyProfile,
   activeTimers,
@@ -76,13 +92,19 @@ export function TodayView({
   onUpsertCategory,
   onDeleteCategory,
   onUpdateVisibleMetricIds,
+  onUpdateWordCommitments,
 }: TodayViewProps) {
   const [draft, setDraft] = useState<DayRecord>(() => day ?? { date: dateKey });
   const [savedFlash, setSavedFlash] = useState("");
+  const [toast, setToast] = useState("");
   const [configureTimers, setConfigureTimers] = useState(false);
   const [configureMetrics, setConfigureMetrics] = useState(false);
+  const [showTaskComposer, setShowTaskComposer] = useState(false);
+  const [showCommitmentForm, setShowCommitmentForm] = useState(false);
   const [manualCategoryId, setManualCategoryId] = useState("");
   const [manualDraft, setManualDraft] = useState({ date: dateKey, hours: "", minutes: "" });
+  const [taskDraft, setTaskDraft] = useState({ title: "", category: "profession" as CategoryGroup });
+  const [commitmentDraft, setCommitmentDraft] = useState({ title: "", targetDays: "30" });
   const [newCategory, setNewCategory] = useState<Omit<TimerCategory, "id">>({
     name: "",
     group: "profession",
@@ -126,6 +148,14 @@ export function TodayView({
   const booleanMetrics = visibleMetrics.filter((metric) => metric.kind === "boolean");
   const textMetrics = visibleMetrics.filter((metric) => metric.kind === "text");
   const dayClosed = Boolean(draft.closedAt);
+  const tasks = draft.tasks ?? [];
+  const doneTasks = tasks.filter((task) => task.done).length;
+  const visibleCommitments = wordCommitments.filter((commitment) => commitment.status !== "paused");
+
+  function showToast(message: string) {
+    setToast(message);
+    window.setTimeout(() => setToast(""), 2400);
+  }
 
   function setNumberField(field: keyof DayRecord, value: string) {
     const nextValue = value === "" ? undefined : Number(value);
@@ -149,18 +179,121 @@ export function TodayView({
   async function saveMetrics() {
     await onSaveDay(dateKey, draft);
     setSavedFlash("Сохранено");
+    showToast("Метрики сохранены");
     window.setTimeout(() => setSavedFlash(""), 1800);
   }
 
   async function closeDay() {
-    await onSaveDay(dateKey, {
+    const closedAt = new Date().toISOString();
+    const closedDay = {
       ...draft,
       points: score.points,
       statusKey: score.statusKey,
-      closedAt: new Date().toISOString(),
+      closedAt,
+    };
+    setDraft(closedDay);
+    await onSaveDay(dateKey, {
+      ...closedDay,
+      points: score.points,
+      statusKey: score.statusKey,
+      closedAt,
     });
     setSavedFlash("День закрыт");
+    showToast(`День закрыт: ${score.statusLabel}, ${score.points} очков`);
     window.setTimeout(() => setSavedFlash(""), 1800);
+  }
+
+  async function saveDayPatch(patch: Partial<DayRecord>, toastMessage?: string) {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    await onSaveDay(dateKey, patch);
+    if (toastMessage) showToast(toastMessage);
+  }
+
+  async function addTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = taskDraft.title.trim();
+    if (!title) return;
+
+    const task: DayTask = {
+      id: crypto.randomUUID(),
+      title,
+      category: taskDraft.category,
+      done: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    await saveDayPatch({ tasks: [...tasks, task] }, "Задача добавлена");
+    setTaskDraft({ title: "", category: taskDraft.category });
+  }
+
+  async function toggleTask(taskId: string) {
+    const nextTasks = tasks.map((task) =>
+      task.id === taskId
+        ? {
+            ...task,
+            done: !task.done,
+            doneAt: !task.done ? new Date().toISOString() : undefined,
+          }
+        : task,
+    );
+    await saveDayPatch({ tasks: nextTasks }, "Задачи дня обновлены");
+  }
+
+  async function deleteTask(taskId: string) {
+    await saveDayPatch({ tasks: tasks.filter((task) => task.id !== taskId) }, "Задача удалена");
+  }
+
+  async function addCommitment(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const title = commitmentDraft.title.trim();
+    const targetDays = Number(commitmentDraft.targetDays);
+    if (!title || !Number.isFinite(targetDays) || targetDays <= 0) return;
+
+    const timestamp = new Date().toISOString();
+    const nextCommitment: WordCommitment = {
+      id: `commitment-${crypto.randomUUID()}`,
+      title,
+      targetDays: Math.round(targetDays),
+      startDate: dateKey,
+      status: "active",
+      checks: {},
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+
+    await onUpdateWordCommitments([...wordCommitments, nextCommitment]);
+    setCommitmentDraft({ title: "", targetDays: "30" });
+    setShowCommitmentForm(false);
+    showToast("Цена слова добавлена");
+  }
+
+  async function markCommitment(commitmentId: string, status: CommitmentCheckStatus) {
+    const nextCommitments = wordCommitments.map((commitment) => {
+      if (commitment.id !== commitmentId) return commitment;
+      const checks = { ...commitment.checks, [dateKey]: status };
+      const doneCount = Object.values(checks).filter((value) => value === "done").length;
+      return {
+        ...commitment,
+        checks,
+        status: doneCount >= commitment.targetDays ? "done" : commitment.status,
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    await onUpdateWordCommitments(nextCommitments);
+    showToast(status === "done" ? "Слово удержано" : status === "miss" ? "Отметил срыв" : "Отметил пропуск");
+  }
+
+  async function pauseCommitment(commitmentId: string) {
+    await onUpdateWordCommitments(
+      wordCommitments.map((commitment) =>
+        commitment.id === commitmentId
+          ? { ...commitment, status: "paused", updatedAt: new Date().toISOString() }
+          : commitment,
+      ),
+    );
+    showToast("Цена слова скрыта");
   }
 
   async function addCategory(event: React.FormEvent<HTMLFormElement>) {
@@ -228,8 +361,14 @@ export function TodayView({
 
   return (
     <div className="space-y-6">
+      {toast && (
+        <div className="fixed right-4 top-4 z-50 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-black text-emerald-900 shadow-soft">
+          {toast}
+        </div>
+      )}
+
       <section className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="panel p-5">
+        <div className={`panel p-5 ${dayClosed ? "border-indigo-200 bg-indigo-50/50" : ""}`}>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -326,6 +465,173 @@ export function TodayView({
       </section>
 
       <WeightTrendPanel days={days} draftDay={draft} profile={bodyProfile} />
+
+      <section className="grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+        <div className="panel p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <ListTodo className="h-5 w-5 text-slate-700" />
+              <div>
+                <h2 className="text-xl font-black">Задачи дня</h2>
+                <p className="text-sm text-slate-500">
+                  Необязательный фокус-лист. В отчеты попадет выполнение {doneTasks}/{tasks.length}.
+                </p>
+              </div>
+            </div>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => setShowTaskComposer((value) => !value)}
+            >
+              <Plus className="h-4 w-4" />
+              Задача
+            </button>
+          </div>
+
+          {showTaskComposer && (
+            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.55fr_auto]" onSubmit={addTask}>
+              <input
+                className="field"
+                placeholder="Что сегодня надо сделать"
+                value={taskDraft.title}
+                onChange={(event) => setTaskDraft((current) => ({ ...current, title: event.target.value }))}
+              />
+              <select
+                className="field"
+                value={taskDraft.category}
+                onChange={(event) =>
+                  setTaskDraft((current) => ({
+                    ...current,
+                    category: event.target.value as CategoryGroup,
+                  }))
+                }
+              >
+                {CATEGORY_GROUPS.map((group) => (
+                  <option key={group} value={group}>
+                    {GROUP_LABELS[group]}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-primary" type="submit">
+                <Save className="h-4 w-4" />
+                Добавить
+              </button>
+            </form>
+          )}
+
+          <div className="mt-4 space-y-2">
+            {tasks.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                Задачи можно не добавлять. Когда нужен фокус на день, добавь 1-5 пунктов.
+              </div>
+            ) : (
+              tasks.map((task) => (
+                <div
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${
+                    task.done ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white"
+                  }`}
+                  key={task.id}
+                >
+                  <button
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-md border ${
+                      task.done
+                        ? "border-emerald-300 bg-emerald-600 text-white"
+                        : "border-slate-300 bg-white text-slate-500"
+                    }`}
+                    type="button"
+                    onClick={() => {
+                      void toggleTask(task.id);
+                    }}
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                  </button>
+                  <div className="min-w-0 flex-1">
+                    <p className={`font-semibold ${task.done ? "text-emerald-900 line-through" : "text-slate-900"}`}>
+                      {task.title}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-500">{GROUP_LABELS[task.category]}</p>
+                  </div>
+                  <button
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                    type="button"
+                    onClick={() => {
+                      void deleteTask(task.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div className="panel p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-indigo-700" />
+              <div>
+                <h2 className="text-xl font-black">Цена слова</h2>
+                <p className="text-sm text-slate-500">1-3 обещания, которые меняют поведение.</p>
+              </div>
+            </div>
+            <button
+              className="btn btn-secondary"
+              type="button"
+              onClick={() => setShowCommitmentForm((value) => !value)}
+            >
+              <Plus className="h-4 w-4" />
+              Обещание
+            </button>
+          </div>
+
+          {showCommitmentForm && (
+            <form className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.45fr_auto]" onSubmit={addCommitment}>
+              <input
+                className="field"
+                placeholder="Например: без Instagram"
+                value={commitmentDraft.title}
+                onChange={(event) => setCommitmentDraft((current) => ({ ...current, title: event.target.value }))}
+              />
+              <input
+                className="field"
+                min="1"
+                type="number"
+                value={commitmentDraft.targetDays}
+                onChange={(event) =>
+                  setCommitmentDraft((current) => ({ ...current, targetDays: event.target.value }))
+                }
+              />
+              <button className="btn btn-primary" type="submit">
+                <Flag className="h-4 w-4" />
+                Старт
+              </button>
+            </form>
+          )}
+
+          <div className="mt-4 space-y-3">
+            {visibleCommitments.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                Активных обещаний нет. Лучше держать не больше трех одновременно.
+              </div>
+            ) : (
+              visibleCommitments.map((commitment) => (
+                <CommitmentCard
+                  commitment={commitment}
+                  dateKey={dateKey}
+                  key={commitment.id}
+                  onMark={(status) => {
+                    void markCommitment(commitment.id, status);
+                  }}
+                  onPause={() => {
+                    void pauseCommitment(commitment.id);
+                  }}
+                />
+              ))
+            )}
+          </div>
+        </div>
+      </section>
 
       <section className="panel p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -685,6 +991,110 @@ function ProgressBar({ value }: { value: number }) {
     <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
       <div className="h-full rounded-full bg-slate-950" style={{ width: `${value}%` }} />
     </div>
+  );
+}
+
+function CommitmentCard({
+  commitment,
+  dateKey,
+  onMark,
+  onPause,
+}: {
+  commitment: WordCommitment;
+  dateKey: string;
+  onMark: (status: CommitmentCheckStatus) => void;
+  onPause: () => void;
+}) {
+  const checks = Object.values(commitment.checks);
+  const doneCount = checks.filter((status) => status === "done").length;
+  const missCount = checks.filter((status) => status === "miss").length;
+  const todayStatus = commitment.checks[dateKey];
+  const complete = commitment.status === "done" || doneCount >= commitment.targetDays;
+  const progress = progressPercent(doneCount, commitment.targetDays);
+
+  return (
+    <article
+      className={`rounded-lg border p-4 ${
+        complete ? "border-amber-200 bg-amber-50" : "border-indigo-100 bg-white"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-black leading-snug text-slate-950">{commitment.title}</p>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            Старт {commitment.startDate} · срывов {missCount}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 rounded-md px-2 py-1 text-xs font-black ${
+            complete ? "bg-amber-200 text-amber-950" : "bg-indigo-50 text-indigo-800"
+          }`}
+        >
+          {doneCount}/{commitment.targetDays}
+        </span>
+      </div>
+
+      <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+        <div
+          className={`h-full rounded-full ${complete ? "bg-amber-500" : "bg-indigo-600"}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <p className="mt-3 text-xs font-semibold text-slate-500">
+        Сегодня:{" "}
+        <span className="text-slate-900">
+          {todayStatus === "done"
+            ? "выполнено"
+            : todayStatus === "miss"
+              ? "срыв"
+              : todayStatus === "skip"
+                ? "пропуск"
+                : "еще не отмечено"}
+        </span>
+      </p>
+
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <button
+          className={`btn min-h-9 px-2 ${
+            todayStatus === "done" ? "bg-emerald-600 text-white" : "border border-emerald-200 bg-emerald-50 text-emerald-800"
+          }`}
+          type="button"
+          onClick={() => onMark("done")}
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          Да
+        </button>
+        <button
+          className={`btn min-h-9 px-2 ${
+            todayStatus === "miss" ? "bg-rose-600 text-white" : "border border-rose-200 bg-rose-50 text-rose-800"
+          }`}
+          type="button"
+          onClick={() => onMark("miss")}
+        >
+          <XCircle className="h-4 w-4" />
+          Срыв
+        </button>
+        <button
+          className={`btn min-h-9 px-2 ${
+            todayStatus === "skip" ? "bg-slate-950 text-white" : "border border-slate-200 bg-slate-50 text-slate-700"
+          }`}
+          type="button"
+          onClick={() => onMark("skip")}
+        >
+          <Pause className="h-4 w-4" />
+          Пауза
+        </button>
+      </div>
+
+      <button
+        className="mt-3 text-xs font-black text-slate-400 hover:text-rose-700"
+        type="button"
+        onClick={onPause}
+      >
+        Скрыть обещание
+      </button>
+    </article>
   );
 }
 

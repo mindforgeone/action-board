@@ -13,7 +13,7 @@ export type ExportPayload = {
   days: DayRecord[];
   timeEntries: TimeEntry[];
   goals: Goal[];
-  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile">;
+  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile" | "wordCommitments">;
 };
 
 export function summarizePeriod(
@@ -34,6 +34,8 @@ export function summarizePeriod(
   let workouts = 0;
   let noAlcoholDays = 0;
   let noBingeDays = 0;
+  let tasksTotal = 0;
+  let tasksDone = 0;
 
   days.forEach((day) => {
     const score = calculateDayScore(
@@ -62,6 +64,8 @@ export function summarizePeriod(
     if (day.workout) workouts += 1;
     if (day.alcohol === false) noAlcoholDays += 1;
     if (day.binge === false) noBingeDays += 1;
+    tasksTotal += day.tasks?.length ?? 0;
+    tasksDone += day.tasks?.filter((task) => task.done).length ?? 0;
   });
 
   const categoriesById = new Map(categories.map((category) => [category.id, category]));
@@ -100,6 +104,8 @@ export function summarizePeriod(
     workouts,
     noAlcoholDays,
     noBingeDays,
+    tasksTotal,
+    tasksDone,
     byCategory,
   };
 }
@@ -109,7 +115,7 @@ export function buildExportPayload(
   entries: TimeEntry[],
   goals: Goal[],
   period: Period,
-  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile">,
+  settings?: Pick<AppSettings, "timerCategories" | "visibleMetricIds" | "bodyProfile" | "wordCommitments">,
 ): ExportPayload {
   const periodDays = Object.values(daysMap)
     .filter((day) => isDateInPeriod(day.date, period.from, period.to))
@@ -194,6 +200,7 @@ export function toCsv(payload: ExportPayload): string {
         artifact: day.artifact,
         reflection: day.reflection,
         note: day.note,
+        tasks: day.tasks,
       }),
     ]);
   });
@@ -225,6 +232,21 @@ export function toCsv(payload: ExportPayload): string {
       String(goal.targetValue),
       goal.status,
       goal.deadline,
+    ]);
+  });
+
+  payload.settings?.wordCommitments?.forEach((commitment) => {
+    rows.push([
+      "commitment",
+      "",
+      commitment.id,
+      commitment.title,
+      "",
+      commitment.status,
+      String(Object.values(commitment.checks).filter((status) => status === "done").length),
+      String(commitment.targetDays),
+      commitment.startDate,
+      JSON.stringify(commitment.checks),
     ]);
   });
 

@@ -122,6 +122,7 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
                   <th className="px-4 py-3">Дата</th>
                   <th className="px-4 py-3">Цвет</th>
                   <th className="px-4 py-3">Очки</th>
+                  <th className="px-4 py-3">Задачи</th>
                   <th className="px-4 py-3">1С</th>
                   <th className="px-4 py-3">Калории</th>
                   <th className="px-4 py-3">Баланс</th>
@@ -134,6 +135,8 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
               <tbody className="divide-y divide-slate-100 bg-white">
                 {pageRows.map((row) => {
                   const bodyEnergy = calculateBodyEnergy(row.day, bodyProfile);
+                  const tasks = row.day.tasks ?? [];
+                  const doneTasks = tasks.filter((task) => task.done).length;
                   return (
                     <tr
                       className={`cursor-pointer transition ${
@@ -156,6 +159,7 @@ export function HistoryView({ days, entries, categories, bodyProfile }: HistoryV
                         </span>
                       </td>
                       <td className="px-4 py-3 font-black">{row.score.points}</td>
+                      <td className="px-4 py-3">{tasks.length ? `${doneTasks}/${tasks.length}` : "-"}</td>
                       <td className="px-4 py-3">
                         {formatDuration(sumMinutes(row.entries, (entry) => entry.categoryId === "skillbox-1c"))}
                       </td>
@@ -242,6 +246,8 @@ function DayDetailsModal({
   const professionMinutes = sumMinutes(row.entries, (entry) => entry.group === "profession");
   const bodyMinutes = sumMinutes(row.entries, (entry) => entry.group === "body");
   const workMinutes = sumMinutes(row.entries, (entry) => entry.group === "work");
+  const tasks = row.day.tasks ?? [];
+  const doneTasks = tasks.filter((task) => task.done).length;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-3 sm:items-center">
@@ -268,6 +274,7 @@ function DayDetailsModal({
             <DetailStat label="Очки" value={String(row.score.points)} />
             <DetailStat label="Профессия" value={formatDuration(professionMinutes)} />
             <DetailStat label="Тело действия" value={formatDuration(bodyMinutes)} />
+            <DetailStat label="Задачи" value={tasks.length ? `${doneTasks}/${tasks.length}` : "-"} />
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -302,6 +309,27 @@ function DayDetailsModal({
                   <li>Очков не было.</li>
                 )}
               </ul>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 p-4">
+            <p className="text-sm font-black text-slate-700">Задачи дня</p>
+            <div className="mt-3 space-y-2">
+              {tasks.length ? (
+                tasks.map((task) => (
+                  <div
+                    className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                      task.done ? "bg-emerald-50 text-emerald-900" : "bg-slate-50 text-slate-600"
+                    }`}
+                    key={task.id}
+                  >
+                    {task.done ? "✓ " : "○ "}
+                    {task.title}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-slate-500">Задач не было.</p>
+              )}
             </div>
           </div>
 

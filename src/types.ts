@@ -4,6 +4,8 @@ export type GoalStatus = "active" | "done" | "paused";
 export type DayStatusKey = "red" | "yellow" | "green" | "combat";
 export type QuickMetricKind = "number" | "boolean" | "text";
 export type BiologicalSex = "male" | "female";
+export type CommitmentStatus = "active" | "done" | "paused";
+export type CommitmentCheckStatus = "done" | "miss" | "skip";
 
 export type TimerCategory = {
   id: string;
@@ -30,6 +32,7 @@ export type DayRecord = {
   workBefore1730Opened?: boolean;
   energy?: number;
   note?: string;
+  tasks?: DayTask[];
   artifact?: string;
   reflection?: string;
   points?: number;
@@ -37,6 +40,15 @@ export type DayRecord = {
   closedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type DayTask = {
+  id: string;
+  title: string;
+  category: CategoryGroup;
+  done: boolean;
+  createdAt?: string;
+  doneAt?: string;
 };
 
 export type TimeEntry = {
@@ -103,10 +115,22 @@ export type BodyProfile = {
   sex: BiologicalSex;
 };
 
+export type WordCommitment = {
+  id: string;
+  title: string;
+  targetDays: number;
+  startDate: string;
+  status: CommitmentStatus;
+  checks: Record<string, CommitmentCheckStatus>;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type AppSettings = {
   timerCategories: TimerCategory[];
   visibleMetricIds: string[];
   bodyProfile: BodyProfile;
+  wordCommitments: WordCommitment[];
   createdAt?: string;
   updatedAt?: string;
 };

@@ -13,7 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { DEFAULT_APP_SETTINGS, DEFAULT_GOALS } from "../constants";
 import { db } from "../firebase";
-import type { AppSettings, DayRecord, Goal, TimerCategory, TimeEntry } from "../types";
+import type { AppSettings, DayRecord, Goal, TimerCategory, TimeEntry, WordCommitment } from "../types";
 
 type ImportablePayload = {
   days?: DayRecord[];
@@ -55,6 +55,10 @@ function normalizeSettings(data: Partial<AppSettings> | undefined): AppSettings 
         ? data.visibleMetricIds
         : DEFAULT_APP_SETTINGS.visibleMetricIds,
     bodyProfile: data?.bodyProfile ?? DEFAULT_APP_SETTINGS.bodyProfile,
+    wordCommitments:
+      Array.isArray(data?.wordCommitments) && data.wordCommitments.length > 0
+        ? data.wordCommitments
+        : DEFAULT_APP_SETTINGS.wordCommitments,
     createdAt: data?.createdAt,
     updatedAt: data?.updatedAt,
   };
@@ -338,6 +342,13 @@ export function useActionBoardData(user: User | null) {
     [saveSettings],
   );
 
+  const updateWordCommitments = useCallback(
+    async (wordCommitments: WordCommitment[]) => {
+      await saveSettings({ wordCommitments });
+    },
+    [saveSettings],
+  );
+
   const importData = useCallback(
     async (payload: unknown) => {
       const firestore = db;
@@ -419,6 +430,7 @@ export function useActionBoardData(user: User | null) {
     upsertTimerCategory,
     deleteTimerCategory,
     updateVisibleMetricIds,
+    updateWordCommitments,
     importData,
   };
 }
